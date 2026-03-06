@@ -35,7 +35,7 @@ class BenchmarkRunner:
         self,
         tasks_dir: Path,
         runs_dir: Path = Path("runs"),
-        model: str = "claude-haiku-4-5-20251001",
+        model: str = "gemini-2.0-flash",
     ) -> None:
         self.tasks_dir = tasks_dir
         self.runs_dir = runs_dir

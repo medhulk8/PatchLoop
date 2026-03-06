@@ -63,8 +63,8 @@ These were explicitly agreed upon. Do not change without user confirmation.
    3 consecutive identical failures → STUCK termination.
 
 7. **Model defaults:**
-   - Dev/iteration: `claude-haiku-4-5-20251001` (fast, cheap)
-   - Final eval: `claude-sonnet-4-6` (reliable patch quality)
+   - Dev/iteration: `gemini-2.0-flash` (free, default) (fast, cheap)
+   - Final eval: `gemini-1.5-pro` (free, stronger) (reliable patch quality)
    - Configurable via `--model` flag.
 
 8. **Benchmark runtime target:**
@@ -88,7 +88,8 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 
 # Set API key
-export ANTHROPIC_API_KEY=sk-...
+# Get free key at: https://aistudio.google.com
+export GEMINI_API_KEY=your_key_here
 ```
 
 The venv is at `.venv/` and is gitignored.
@@ -101,7 +102,7 @@ The venv is at `.venv/` and is gitignored.
 # Run a single task (best for debugging)
 patchloop run mini_003
 patchloop run mini_001 --baseline single_shot
-patchloop run mini_002 --baseline loop --model claude-sonnet-4-6
+patchloop run mini_002 --baseline loop --model gemini-1.5-pro
 
 # Run full benchmark (all tasks × all baselines)
 patchloop bench
@@ -249,3 +250,32 @@ All writes are flushed immediately (no buffering) to survive crashes.
 - mini_001's original retry.py had a non-bug (the except PermanentError
   clause was correct). Fixed: now uses a single `except Exception` clause
   that incorrectly catches PermanentError.
+
+---
+
+## LLM Provider Setup
+
+We use Google Gemini (free) via an OpenAI-compatible endpoint.
+The `openai` Python package is just a universal SDK — it talks to Google's servers, not OpenAI's.
+
+### Default (Gemini — free)
+```bash
+export GEMINI_API_KEY=your_key_here
+# Get free key at: https://aistudio.google.com (no credit card)
+```
+Default model: `gemini-2.0-flash` | Stronger: `gemini-1.5-pro`
+
+### Alternative: Groq (also free)
+```bash
+export LLM_API_KEY=your_groq_key
+export LLM_BASE_URL=https://api.groq.com/openai/v1
+# patchloop run mini_001 --model llama-3.1-70b-versatile
+```
+Get free key at: https://console.groq.com
+
+### Environment variables
+| Variable | Purpose |
+|---|---|
+| `GEMINI_API_KEY` | Google Gemini API key (preferred) |
+| `LLM_API_KEY` | Generic override for any provider |
+| `LLM_BASE_URL` | Custom API base URL (default: Gemini endpoint) |

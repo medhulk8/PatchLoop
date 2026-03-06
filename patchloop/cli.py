@@ -18,7 +18,7 @@ console = Console()
 
 _DEFAULT_TASKS_DIR = Path("eval/tasks")
 _DEFAULT_RUNS_DIR = Path("runs")
-_DEFAULT_MODEL = "claude-haiku-4-5-20251001"
+_DEFAULT_MODEL = "gemini-2.0-flash"
 
 
 @app.command()
@@ -47,7 +47,7 @@ def bench(
     model: str = typer.Option(
         _DEFAULT_MODEL,
         "--model", "-m",
-        help="Claude model to use for all LLM calls.",
+        help="Model to use for all LLM calls.",
     ),
 ) -> None:
     """
@@ -60,7 +60,7 @@ def bench(
         patchloop bench                            # all tasks, all baselines
         patchloop bench -b single_shot -b loop     # two baselines only
         patchloop bench -t mini_001 -t mini_002    # two specific tasks
-        patchloop bench -m claude-sonnet-4-6       # stronger model
+        patchloop bench -m gemini-1.5-pro           # stronger model
     """
     runner = BenchmarkRunner(
         tasks_dir=tasks_dir,

@@ -1,57 +1,74 @@
 from __future__ import annotations
 
+import json
+import os
 from typing import Any, Callable
 
-import anthropic
+from openai import OpenAI
 
 from patchloop.agent.state import IterationRecord
 
-# Tool definitions exposed to the LLM during the PLAN phase.
-# The agent uses these to explore the codebase before proposing a patch.
+# Default provider: Google Gemini via its OpenAI-compatible endpoint.
+# Free API key from: https://aistudio.google.com
+# Set env var: GEMINI_API_KEY=<your_key>
+_DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_DEFAULT_MODEL = "gemini-2.0-flash"
+
+# Tool definitions in OpenAI function-calling format.
+# This format is accepted by Gemini, Groq, and any OpenAI-compatible provider.
 CODING_TOOLS: list[dict[str, Any]] = [
     {
-        "name": "read_file",
-        "description": "Read the full contents of a file in the workspace.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "File path relative to repo root (e.g. src/utils.py)",
-                }
+        "type": "function",
+        "function": {
+            "name": "read_file",
+            "description": "Read the full contents of a file in the workspace.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {
+                        "type": "string",
+                        "description": "File path relative to repo root (e.g. src/utils.py)",
+                    }
+                },
+                "required": ["path"],
             },
-            "required": ["path"],
         },
     },
     {
-        "name": "list_files",
-        "description": "List files in the workspace matching a glob pattern.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "Glob pattern. Default: **/*.py",
-                }
+        "type": "function",
+        "function": {
+            "name": "list_files",
+            "description": "List files in the workspace matching a glob pattern.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string",
+                        "description": "Glob pattern. Default: **/*.py",
+                    }
+                },
+                "required": [],
             },
-            "required": [],
         },
     },
     {
-        "name": "search_code",
-        "description": (
-            "Search for a string across all Python files. "
-            "Returns file path, line number, and matching line text."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Search string (case-insensitive).",
-                }
+        "type": "function",
+        "function": {
+            "name": "search_code",
+            "description": (
+                "Search for a string across all Python files. "
+                "Returns file path, line number, and matching line text."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search string (case-insensitive).",
+                    }
+                },
+                "required": ["query"],
             },
-            "required": ["query"],
         },
     },
 ]
@@ -59,24 +76,45 @@ CODING_TOOLS: list[dict[str, Any]] = [
 
 class LLMClient:
     """
-    Thin wrapper around the Anthropic SDK.
+    Provider-agnostic LLM client using the OpenAI-compatible API format.
+
+    Default: Google Gemini 2.0 Flash (free tier via aistudio.google.com).
+    Can target any OpenAI-compatible provider by setting env vars:
+      GEMINI_API_KEY  — for Gemini (default)
+      LLM_API_KEY     — generic override
+      LLM_BASE_URL    — custom base URL (e.g. Groq, local Ollama, etc.)
 
     Responsibilities:
-    - Token usage tracking per call, accumulated into IterationRecord
+    - Token tracking per call, accumulated into IterationRecord
     - Agentic tool-use loop (chat_with_tools) for the PLAN phase
     - Simple text completion (chat) for ANALYZE and REFLECT phases
-
-    All API calls go through _call() so token tracking is never missed.
     """
 
     def __init__(
         self,
-        model: str = "claude-haiku-4-5-20251001",
+        model: str = _DEFAULT_MODEL,
         max_tokens: int = 4096,
+        api_key: str | None = None,
+        base_url: str | None = None,
     ) -> None:
         self.model = model
         self.max_tokens = max_tokens
-        self._client = anthropic.Anthropic()
+
+        resolved_key = (
+            api_key
+            or os.environ.get("LLM_API_KEY")
+            or os.environ.get("GEMINI_API_KEY")
+        )
+        resolved_url = base_url or os.environ.get("LLM_BASE_URL", _DEFAULT_BASE_URL)
+
+        if not resolved_key:
+            raise RuntimeError(
+                "No API key found.\n"
+                "Set GEMINI_API_KEY to use Google Gemini (free tier).\n"
+                "Get a free key at: https://aistudio.google.com"
+            )
+
+        self._client = OpenAI(api_key=resolved_key, base_url=resolved_url)
 
     # ------------------------------------------------------------------ #
     # Core API call
@@ -84,29 +122,24 @@ class LLMClient:
 
     def _call(
         self,
-        system: str,
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         record: IterationRecord | None = None,
-    ) -> anthropic.types.Message:
+    ) -> Any:
         """Single API call. Updates record token counts if provided."""
         kwargs: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
-            "system": system,
             "messages": messages,
         }
         if tools:
             kwargs["tools"] = tools
 
-        response = self._client.messages.create(**kwargs)
+        response = self._client.chat.completions.create(**kwargs)
 
-        if record is not None:
+        if record is not None and response.usage:
             record.llm_calls += 1
-            if response.usage:
-                record.total_tokens += (
-                    response.usage.input_tokens + response.usage.output_tokens
-                )
+            record.total_tokens += response.usage.total_tokens or 0
 
         return response
 
@@ -121,12 +154,12 @@ class LLMClient:
         record: IterationRecord | None = None,
     ) -> str:
         """Single-turn text completion. Returns assistant text."""
-        response = self._call(
-            system=system,
-            messages=[{"role": "user", "content": user_message}],
-            record=record,
-        )
-        return self._extract_text(response)
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user_message},
+        ]
+        response = self._call(messages=messages, record=record)
+        return response.choices[0].message.content or ""
 
     # ------------------------------------------------------------------ #
     # Tool-use loop (PLAN phase)
@@ -144,63 +177,54 @@ class LLMClient:
         """
         Agentic tool-use loop.
 
-        The model can call tools repeatedly until it reaches end_turn
-        (meaning it's done exploring and has produced a final answer).
+        The model repeatedly calls tools until finish_reason == "stop",
+        meaning it has finished exploring and produced its final answer.
 
-        tool_handler: called for each tool_use block with (tool_name, tool_input).
+        tool_handler: called for each tool call with (tool_name, tool_args_dict).
                       Must return a string result.
-        max_tool_rounds: safety cap to prevent infinite loops.
+        max_tool_rounds: safety cap to prevent runaway loops.
         """
+        # System message goes first in the messages list
+        full_messages: list[dict[str, Any]] = (
+            [{"role": "system", "content": system}] + messages
+        )
+
         for _ in range(max_tool_rounds):
             response = self._call(
-                system=system,
-                messages=messages,
+                messages=full_messages,
                 tools=tools,
                 record=record,
             )
+            choice = response.choices[0]
 
-            if response.stop_reason == "end_turn":
-                return self._extract_text(response)
+            if choice.finish_reason == "stop":
+                return choice.message.content or ""
 
-            if response.stop_reason == "tool_use":
-                # Append the assistant's tool-use message to history
-                messages = messages + [
-                    {"role": "assistant", "content": response.content}
-                ]
+            if choice.finish_reason == "tool_calls":
+                # Append the assistant turn (contains tool_calls) to history
+                full_messages.append(
+                    choice.message.model_dump(exclude_unset=False)
+                )
 
-                # Execute each tool and collect results
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        try:
-                            result = tool_handler(block.name, block.input)
-                        except Exception as e:
-                            result = f"Tool error: {e}"
-                        tool_results.append(
-                            {
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": str(result),
-                            }
-                        )
+                # Execute each tool call and append result messages
+                for tc in choice.message.tool_calls or []:
+                    try:
+                        args = json.loads(tc.function.arguments or "{}")
+                        result = tool_handler(tc.function.name, args)
+                    except Exception as e:
+                        result = f"Tool error: {e}"
 
-                # Feed results back as a user message (Anthropic's convention)
-                messages = messages + [
-                    {"role": "user", "content": tool_results}
-                ]
+                    full_messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tc.id,
+                            "content": str(result),
+                        }
+                    )
                 continue
 
-            # Unexpected stop reason — return what we have
-            return self._extract_text(response)
+            # Any other finish reason — return whatever content we have
+            return choice.message.content or ""
 
-        return self._extract_text(response)
-
-    # ------------------------------------------------------------------ #
-    # Utilities
-    # ------------------------------------------------------------------ #
-
-    @staticmethod
-    def _extract_text(response: anthropic.types.Message) -> str:
-        return "\n".join(
-            block.text for block in response.content if hasattr(block, "text")
-        ).strip()
+        # Exhausted rounds without reaching "stop"
+        return response.choices[0].message.content or ""
