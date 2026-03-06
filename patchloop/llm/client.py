@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any, Callable
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 from patchloop.agent.state import IterationRecord
 
@@ -12,7 +13,8 @@ from patchloop.agent.state import IterationRecord
 # Free API key from: https://aistudio.google.com
 # Set env var: GEMINI_API_KEY=<your_key>
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-_DEFAULT_MODEL = "gemini-2.0-flash"
+# gemini-1.5-flash is the confirmed free-tier model (gemini-2.0-flash requires billing)
+_DEFAULT_MODEL = "gemini-1.5-flash"
 
 # Tool definitions in OpenAI function-calling format.
 # This format is accepted by Gemini, Groq, and any OpenAI-compatible provider.
@@ -125,8 +127,15 @@ class LLMClient:
         messages: list[dict[str, Any]],
         tools: list[dict[str, Any]] | None = None,
         record: IterationRecord | None = None,
+        _retries: int = 4,
     ) -> Any:
-        """Single API call. Updates record token counts if provided."""
+        """
+        Single API call with exponential backoff on rate limit errors (429).
+
+        Free-tier APIs have low rate limits. Rather than crashing the whole
+        benchmark run on a temporary quota hit, we wait and retry up to
+        _retries times with exponential backoff (5s, 10s, 20s, 40s).
+        """
         kwargs: dict[str, Any] = {
             "model": self.model,
             "max_tokens": self.max_tokens,
@@ -135,7 +144,17 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
-        response = self._client.chat.completions.create(**kwargs)
+        delay = 5.0
+        for attempt in range(_retries + 1):
+            try:
+                response = self._client.chat.completions.create(**kwargs)
+                break
+            except RateLimitError as e:
+                if attempt == _retries:
+                    raise
+                print(f"  [rate limit] waiting {delay:.0f}s before retry {attempt + 1}/{_retries}...")
+                time.sleep(delay)
+                delay *= 2   # exponential backoff: 5 → 10 → 20 → 40
 
         if record is not None and response.usage:
             record.llm_calls += 1

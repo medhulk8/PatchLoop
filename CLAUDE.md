@@ -63,7 +63,7 @@ These were explicitly agreed upon. Do not change without user confirmation.
    3 consecutive identical failures → STUCK termination.
 
 7. **Model defaults:**
-   - Dev/iteration: `gemini-2.0-flash` (free, default) (fast, cheap)
+   - Dev/iteration: `gemini-1.5-flash` (free, confirmed default) (fast, cheap)
    - Final eval: `gemini-1.5-pro` (free, stronger) (reliable patch quality)
    - Configurable via `--model` flag.
 
@@ -263,7 +263,7 @@ The `openai` Python package is just a universal SDK — it talks to Google's ser
 export GEMINI_API_KEY=your_key_here
 # Get free key at: https://aistudio.google.com (no credit card)
 ```
-Default model: `gemini-2.0-flash` | Stronger: `gemini-1.5-pro`
+Default model: `gemini-1.5-flash` | Stronger: `gemini-1.5-pro`
 
 ### Alternative: Groq (also free)
 ```bash
