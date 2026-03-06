@@ -89,7 +89,9 @@ class LocalEnvironment(Environment):
     # ------------------------------------------------------------------ #
 
     def read_file(self, path: str) -> str:
-        target = self.workdir / path
+        target = (self.workdir / path).resolve()
+        if not target.is_relative_to(self.workdir.resolve()):
+            raise PermissionError(f"Path escapes workspace: {path}")
         if not target.exists():
             raise FileNotFoundError(f"Not found in workspace: {path}")
         return target.read_text(encoding="utf-8", errors="replace")

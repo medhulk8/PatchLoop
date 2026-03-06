@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import traceback
+from collections import Counter
 from typing import TYPE_CHECKING
 
 from patchloop.agent.patcher import Patcher
@@ -8,7 +9,6 @@ from patchloop.agent.planner import Planner
 from patchloop.agent.reflector import Reflector
 from patchloop.agent.state import (
     AgentPhase,
-    IterationRecord,
     LoopState,
     TerminationReason,
 )
@@ -263,15 +263,20 @@ class AgentLoop:
     # ------------------------------------------------------------------ #
 
     def _build_task_result(self, state: LoopState) -> TaskResult:
-        repeated = sum(
-            1 for rec in state.iterations
-            if rec.error_signature in state.seen_error_signatures[1:]
+        # Count iterations that repeated a previously-seen failure signature.
+        sig_counts = Counter(
+            rec.error_signature
+            for rec in state.iterations
+            if rec.error_signature
         )
+        repeated = sum(max(count - 1, 0) for count in sig_counts.values())
+
         diff_text = self.env.git_diff()
         loc = len([
-            l for l in diff_text.splitlines()
-            if l.startswith("+") or l.startswith("-")
-            and not l.startswith("+++") and not l.startswith("---")
+            line for line in diff_text.splitlines()
+            if (line.startswith("+") or line.startswith("-"))
+            and not line.startswith("+++")
+            and not line.startswith("---")
         ])
 
         return TaskResult(
@@ -279,7 +284,7 @@ class AgentLoop:
             run_id=state.run_id,
             baseline=self.baseline,
             resolved=state.resolved,
-            iterations_used=state.iteration,
+            iterations_used=len(state.iterations),
             total_duration_s=state.elapsed_s,
             termination_reason=state.termination_reason.value
             if state.termination_reason
