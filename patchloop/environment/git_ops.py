@@ -42,7 +42,9 @@ def _apply_unified_diff(diff: str, workdir: Path) -> list[str]:
             if target_file is None:
                 raise ValueError(f"Hunk found before file header at line {i}")
 
-            filepath = workdir / target_file
+            filepath = (workdir / target_file).resolve()
+            if not filepath.is_relative_to(workdir.resolve()):
+                raise ValueError(f"Patch path escapes workspace: {target_file}")
             if not filepath.exists():
                 raise ValueError(f"File not found: {target_file}")
 

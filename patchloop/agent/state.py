@@ -36,7 +36,6 @@ class TerminationReason(str, Enum):
     MAX_ITERATIONS  = "MAX_ITERATIONS"
     TIME_LIMIT      = "TIME_LIMIT"
     STUCK           = "STUCK"           # anti-repeat: same failure N times in a row
-    APPLY_FAILED    = "APPLY_FAILED"    # patch couldn't be applied at all
     NO_DIFF         = "NO_DIFF"         # LLM produced no diff
     ERROR           = "ERROR"           # unexpected runtime error
 
@@ -97,7 +96,9 @@ class IterationRecord(BaseModel):
     total_tokens: int = 0
 
     def close(self) -> None:
-        """Mark the iteration as finished and compute duration."""
+        """Mark the iteration as finished and compute duration. Idempotent."""
+        if self.ended_at is not None:
+            return
         self.ended_at = _utcnow()
         self.duration_s = round(
             (self.ended_at - self.started_at).total_seconds(), 2
