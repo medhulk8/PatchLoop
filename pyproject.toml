@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "patchloop"
+version = "0.1.0"
+description = "Benchmarkable self-improving coding agent with reflexion-style memory"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.40.0",
+    "pydantic>=2.0",
+    "gitpython>=3.1",
+    "pyyaml>=6.0",
+    "typer>=0.12",
+    "rich>=13.0",
+    "jsonlines>=4.0",
+    "pytest>=8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest-timeout>=2.3",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+patchloop = "patchloop.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["patchloop*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
