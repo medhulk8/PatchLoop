@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import subprocess
 from pathlib import Path
-from typing import Any
 
 
 def _apply_unified_diff(diff: str, workdir: Path) -> list[str]:
@@ -170,11 +169,15 @@ class GitOps:
     # Diff / status
     # ------------------------------------------------------------------ #
 
-    def diff(self) -> str:
-        """Unified diff of working tree + staged changes vs HEAD."""
-        _, staged, _ = self._run("diff", "--cached", "HEAD")
-        _, unstaged, _ = self._run("diff", "HEAD")
-        return staged or unstaged
+    def diff(self, ref: str = "HEAD") -> str:
+        """Unified diff of working tree vs ref (default: HEAD).
+
+        Using git diff HEAD shows all uncommitted changes (staged + unstaged)
+        in a single pass, avoiding the 'staged or unstaged' drop problem.
+        Pass a specific SHA to compare committed changes against a snapshot.
+        """
+        _, stdout, _ = self._run("diff", ref)
+        return stdout
 
     def diff_stat(self) -> str:
         _, stdout, _ = self._run("diff", "HEAD", "--stat")

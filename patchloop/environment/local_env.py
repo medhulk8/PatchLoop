@@ -97,12 +97,19 @@ class LocalEnvironment(Environment):
         return target.read_text(encoding="utf-8", errors="replace")
 
     def list_files(self, pattern: str = "**/*.py") -> list[str]:
-        return sorted(
-            str(p.relative_to(self.workdir))
-            for p in self.workdir.glob(pattern)
-            if not any(part.startswith(".") for part in p.relative_to(self.workdir).parts)
-            and p.is_file()
-        )
+        workdir_resolved = self.workdir.resolve()
+        results = []
+        for p in self.workdir.glob(pattern):
+            resolved = p.resolve()
+            if not resolved.is_relative_to(workdir_resolved):
+                continue  # block traversal via ../.. patterns
+            if not p.is_file():
+                continue
+            rel = resolved.relative_to(workdir_resolved)
+            if any(part.startswith(".") for part in rel.parts):
+                continue
+            results.append(str(rel))
+        return sorted(results)
 
     def search_code(self, query: str) -> list[dict[str, Any]]:
         results: list[dict[str, Any]] = []
@@ -163,7 +170,10 @@ class LocalEnvironment(Environment):
     # ------------------------------------------------------------------ #
 
     def git_diff(self) -> str:
-        return self.git.diff()
+        # Compare against the initial snapshot so loc_changed reflects the
+        # actual patch committed during the run, not just uncommitted edits.
+        ref = self._snapshot_sha or "HEAD"
+        return self.git.diff(ref)
 
     def git_commit(self, message: str) -> str:
         return self.git.commit(message)
