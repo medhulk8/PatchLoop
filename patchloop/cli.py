@@ -18,7 +18,7 @@ console = Console()
 
 _DEFAULT_TASKS_DIR = Path("eval/tasks")
 _DEFAULT_RUNS_DIR = Path("runs")
-_DEFAULT_MODEL = "gemini-1.5-flash"
+_DEFAULT_MODEL = "gemini-2.5-flash"
 
 
 @app.command()

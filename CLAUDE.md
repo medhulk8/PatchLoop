@@ -24,13 +24,18 @@ formal benchmark comparing three baselines.
 
 ## Current Status
 
-**Phase 1 skeleton: COMPLETE and pushed to GitHub.**
+**End-to-end WORKS. mini_001 and mini_003 resolve in single_shot.**
 
-Everything imports cleanly. Tasks verified failing on broken code.
-End-to-end run (`patchloop run mini_003`) has NOT been tested yet.
+Bugs fixed this session:
+- Switched default model: gemini-1.5-flash (deprecated) → gemini-2.5-flash
+- Removed `required: []` empty array from list_files tool schema (Gemini rejects it)
+- Fixed `model_dump(exclude_unset=False)` → `model_dump(exclude_none=True, exclude_unset=True)`
+  (null fields like "annotations", "audio" in tool_calls message caused 400 errors)
+- Replaced `git apply` with pure Python unified diff applier (_apply_unified_diff in git_ops.py)
+  git apply was mysteriously failing on macOS despite correct patch content
 
-Next session priority: run end-to-end, fix any runtime issues, then
-expand Mini-Bench to 10 tasks.
+Next session priority: run mini_002, then run full benchmark across all 3 baselines,
+then expand Mini-Bench to 10 tasks.
 
 ---
 
@@ -63,8 +68,8 @@ These were explicitly agreed upon. Do not change without user confirmation.
    3 consecutive identical failures → STUCK termination.
 
 7. **Model defaults:**
-   - Dev/iteration: `gemini-1.5-flash` (free, confirmed default) (fast, cheap)
-   - Final eval: `gemini-1.5-pro` (free, stronger) (reliable patch quality)
+   - Dev/iteration: `gemini-2.5-flash` (free, confirmed working default)
+   - Alternative: `gemini-2.0-flash` (also listed as available)
    - Configurable via `--model` flag.
 
 8. **Benchmark runtime target:**
@@ -263,7 +268,7 @@ The `openai` Python package is just a universal SDK — it talks to Google's ser
 export GEMINI_API_KEY=your_key_here
 # Get free key at: https://aistudio.google.com (no credit card)
 ```
-Default model: `gemini-1.5-flash` | Stronger: `gemini-1.5-pro`
+Default model: `gemini-2.5-flash` (free, confirmed working March 2026)
 
 ### Alternative: Groq (also free)
 ```bash

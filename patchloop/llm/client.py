@@ -13,8 +13,8 @@ from patchloop.agent.state import IterationRecord
 # Free API key from: https://aistudio.google.com
 # Set env var: GEMINI_API_KEY=<your_key>
 _DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-# gemini-1.5-flash is the confirmed free-tier model (gemini-2.0-flash requires billing)
-_DEFAULT_MODEL = "gemini-1.5-flash"
+# gemini-2.5-flash is the recommended free-tier model (gemini-1.5-flash deprecated March 2026)
+_DEFAULT_MODEL = "gemini-2.5-flash"
 
 # Tool definitions in OpenAI function-calling format.
 # This format is accepted by Gemini, Groq, and any OpenAI-compatible provider.
@@ -49,7 +49,6 @@ CODING_TOOLS: list[dict[str, Any]] = [
                         "description": "Glob pattern. Default: **/*.py",
                     }
                 },
-                "required": [],
             },
         },
     },
@@ -220,9 +219,10 @@ class LLMClient:
                 return choice.message.content or ""
 
             if choice.finish_reason == "tool_calls":
-                # Append the assistant turn (contains tool_calls) to history
+                # Append the assistant turn (contains tool_calls) to history.
+                # Use exclude_none=True to strip null fields that Gemini rejects.
                 full_messages.append(
-                    choice.message.model_dump(exclude_unset=False)
+                    choice.message.model_dump(exclude_none=True, exclude_unset=True)
                 )
 
                 # Execute each tool call and append result messages
