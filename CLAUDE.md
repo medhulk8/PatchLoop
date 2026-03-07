@@ -108,10 +108,20 @@ formal benchmark comparing three baselines.
   mini_005/mini_006 terminate at iters=1 even with max_iterations=5 (NO_DIFF: model outputs prose).
   Tasks are well-calibrated; model quality is the bottleneck — need Gemini for full results.
 
+**Session 6 — File pre-loading + Cerebras provider:**
+- Planner now pre-loads all `.py` files from the workspace into the initial PLAN message.
+  `_build_repo_context(env)` reads all Python files and injects them as a "Repository Files"
+  section. Model starts with full context → tool-call rounds drop from ~8 to ~1-2 per iter.
+  Tools still available as optional fallback (model can call them if needed).
+  System prompt updated to reflect that files are already provided.
+- Added Cerebras as a provider: set `CEREBRAS_API_KEY` and the base URL auto-configures to
+  `https://api.cerebras.ai/v1`. Recommended model: `llama3.1-70b` (14,400 RPD free tier).
+  See LLM Provider Setup section for commands.
+
 ### Next session priority
-1. Run full 10-task benchmark with Gemini (quota resets daily; get new key at aistudio.google.com)
-2. Produce final results table across all 10 tasks showing reflection advantage
-3. Ablation writeup: compare single_shot vs loop vs loop_reflect across task difficulty tiers
+1. Test Cerebras with `patchloop run mini_001 --model llama3.1-70b` to verify tool use quality
+2. Run full 10-task benchmark with Cerebras if quality is good
+3. Produce final results table across all 10 tasks showing reflection advantage
 
 ---
 
@@ -362,8 +372,7 @@ All writes are flushed immediately (no buffering) to survive crashes.
   **Workarounds:**
   - Run each baseline on a separate day: `patchloop bench -b single_shot`, next day `-b loop`, etc.
   - Use a fresh API key per baseline
-  - Rate limit retry backoff is now 60s base (guarantees RPM window reset)
-  - Inter-task delay of 15s added to bench_runner to spread RPM load
+  - Use Cerebras (14,400 RPD, auto-configured via CEREBRAS_API_KEY) for reliable full runs
 
 ---
 
@@ -379,11 +388,20 @@ export GEMINI_API_KEY=your_key_here
 ```
 Default model: `gemini-2.5-flash` (free, confirmed working March 2026)
 
-### Alternative: Groq (also free)
+### Alternative: Cerebras (also free — 14,400 RPD)
+```bash
+export CEREBRAS_API_KEY=your_cerebras_key
+# Base URL auto-configured. Recommended model:
+patchloop run mini_001 --model llama3.1-70b
+patchloop bench --model llama3.1-70b
+```
+Get free key at: https://cloud.cerebras.ai
+
+### Alternative: Groq (also free — 14,400 RPD)
 ```bash
 export LLM_API_KEY=your_groq_key
 export LLM_BASE_URL=https://api.groq.com/openai/v1
-# patchloop run mini_001 --model llama-3.1-70b-versatile
+patchloop run mini_001 --model llama-3.3-70b-versatile
 ```
 Get free key at: https://console.groq.com
 

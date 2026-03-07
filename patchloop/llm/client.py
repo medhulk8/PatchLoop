@@ -13,7 +13,9 @@ from patchloop.agent.state import IterationRecord
 # Default provider: Google Gemini via its OpenAI-compatible endpoint.
 # Free API key from: https://aistudio.google.com
 # Set env var: GEMINI_API_KEY=<your_key>
-_DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_CEREBRAS_BASE_URL = "https://api.cerebras.ai/v1"
+_DEFAULT_BASE_URL = _GEMINI_BASE_URL
 # gemini-2.5-flash is the recommended free-tier model (gemini-1.5-flash deprecated March 2026)
 _DEFAULT_MODEL = "gemini-2.5-flash"
 
@@ -105,9 +107,18 @@ class LLMClient:
         resolved_key = (
             api_key
             or os.environ.get("LLM_API_KEY")
+            or os.environ.get("CEREBRAS_API_KEY")
             or os.environ.get("GEMINI_API_KEY")
         )
-        resolved_url = base_url or os.environ.get("LLM_BASE_URL", _DEFAULT_BASE_URL)
+        # Auto-detect base URL: explicit arg > env var > Cerebras auto-detect > Gemini default
+        if base_url:
+            resolved_url = base_url
+        elif os.environ.get("LLM_BASE_URL"):
+            resolved_url = os.environ["LLM_BASE_URL"]
+        elif os.environ.get("CEREBRAS_API_KEY") and not api_key and not os.environ.get("LLM_API_KEY"):
+            resolved_url = _CEREBRAS_BASE_URL
+        else:
+            resolved_url = _DEFAULT_BASE_URL
 
         if not resolved_key:
             raise RuntimeError(
