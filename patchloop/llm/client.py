@@ -100,9 +100,11 @@ class LLMClient:
         max_tokens: int = 4096,
         api_key: str | None = None,
         base_url: str | None = None,
+        call_delay: float = 0.0,
     ) -> None:
         self.model = model
         self.max_tokens = max_tokens
+        self.call_delay = call_delay  # seconds to sleep before each API call (rate-limit pacing)
 
         resolved_key = (
             api_key
@@ -155,15 +157,19 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
+        if self.call_delay > 0:
+            time.sleep(self.call_delay)
+
         delay = 30.0
         for attempt in range(_retries + 1):
             try:
                 response = self._client.chat.completions.create(**kwargs)
                 break
-            except RateLimitError:
+            except RateLimitError as _rle:
                 if attempt == _retries:
                     raise
-                print(f"  [rate limit] waiting {delay:.0f}s before retry {attempt + 1}/{_retries}...", flush=True, file=sys.stderr)
+                _body = getattr(_rle, "body", None)
+                print(f"  [rate limit] waiting {delay:.0f}s before retry {attempt + 1}/{_retries}... body={_body}", flush=True, file=sys.stderr)
                 time.sleep(delay)
                 delay = min(delay * 2, 60.0)  # backoff: 30 → 60 → 60 → 60
 

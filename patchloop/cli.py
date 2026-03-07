@@ -49,6 +49,27 @@ def bench(
         "--model", "-m",
         help="Model to use for all LLM calls.",
     ),
+    tool_rounds: int = typer.Option(
+        15,
+        "--tool-rounds",
+        help="Max tool-use rounds per planning step (search budget). Default: 15.",
+    ),
+    num_runs: int = typer.Option(
+        1,
+        "--num-runs", "-n",
+        help="Number of seeds per (task, baseline). Results are pooled for averaging. Default: 1.",
+    ),
+    run_delay: int = typer.Option(
+        30,
+        "--run-delay",
+        help="Seconds to wait between repeated seeds (to avoid rate-limit bursts). Default: 30.",
+    ),
+    call_delay: float = typer.Option(
+        0.0,
+        "--call-delay",
+        help="Seconds to sleep before each individual LLM API call (rate-limit pacing). "
+             "Use ~7.0 for Cerebras free tier (10 RPM). Default: 0.",
+    ),
 ) -> None:
     """
     Run the full benchmark across tasks and baselines.
@@ -61,11 +82,18 @@ def bench(
         patchloop bench -b single_shot -b loop     # two baselines only
         patchloop bench -t mini_001 -t mini_002    # two specific tasks
         patchloop bench -m gemini-1.5-pro           # stronger model
+        patchloop bench --tool-rounds 4            # constrained search budget
+        patchloop bench --num-runs 3 --run-delay 60  # 3x averaged, 60s between seeds
+        patchloop bench --call-delay 7             # pace calls for Cerebras 10 RPM limit
     """
     runner = BenchmarkRunner(
         tasks_dir=tasks_dir,
         runs_dir=runs_dir,
         model=model,
+        max_tool_rounds=tool_rounds,
+        num_runs=num_runs,
+        run_delay_s=run_delay,
+        call_delay=call_delay,
     )
     results = runner.run(
         baselines=list(baselines) if baselines else None,
@@ -94,6 +122,16 @@ def run(
         _DEFAULT_MODEL,
         "--model", "-m",
     ),
+    tool_rounds: int = typer.Option(
+        15,
+        "--tool-rounds",
+        help="Max tool-use rounds per planning step (search budget). Default: 15.",
+    ),
+    call_delay: float = typer.Option(
+        0.0,
+        "--call-delay",
+        help="Seconds to sleep before each LLM API call (rate-limit pacing). Default: 0.",
+    ),
 ) -> None:
     """
     Run a single task with a single baseline. Useful for debugging.
@@ -101,6 +139,7 @@ def run(
     Example:
         patchloop run mini_001
         patchloop run mini_002 --baseline single_shot
+        patchloop run mini_004 --tool-rounds 4
     """
     from patchloop.eval.baselines import build_agent
     from patchloop.environment.task import Task
@@ -116,6 +155,8 @@ def run(
         baseline=baseline,
         model=model,
         runs_dir=runs_dir,
+        max_tool_rounds=tool_rounds,
+        call_delay=call_delay,
     )
 
     console.print(

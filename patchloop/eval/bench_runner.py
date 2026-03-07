@@ -36,10 +36,18 @@ class BenchmarkRunner:
         tasks_dir: Path,
         runs_dir: Path = Path("runs"),
         model: str = "gemini-2.5-flash",
+        max_tool_rounds: int = 15,
+        num_runs: int = 1,
+        run_delay_s: int = 30,
+        call_delay: float = 0.0,
     ) -> None:
         self.tasks_dir = tasks_dir
         self.runs_dir = runs_dir
         self.model = model
+        self.max_tool_rounds = max_tool_rounds
+        self.num_runs = num_runs
+        self.run_delay_s = run_delay_s
+        self.call_delay = call_delay
         self.runs_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------ #
@@ -84,22 +92,38 @@ class BenchmarkRunner:
 
         baselines: which baselines to evaluate. Defaults to all three.
         task_ids: subset of tasks to run. None = all tasks.
+
+        If num_runs > 1, each (task, baseline) pair is run num_runs times
+        and results are pooled for averaging. A delay of run_delay_s seconds
+        is inserted between repetitions to avoid rate-limit bursts.
         """
         baselines = baselines or list(BASELINES)
         tasks = self.load_tasks(task_ids)
 
+        runs_label = f" × {self.num_runs} seeds" if self.num_runs > 1 else ""
         console.print(
             f"\n[bold]PatchLoop Benchmark[/bold] | "
-            f"{len(tasks)} tasks × {len(baselines)} baselines "
+            f"{len(tasks)} tasks × {len(baselines)} baselines{runs_label} "
             f"| model: {self.model}\n"
         )
 
         all_results: list[TaskResult] = []
 
-        for baseline in baselines:
-            console.rule(f"[bold blue]Baseline: {baseline}[/bold blue]")
-            baseline_results = self._run_baseline(baseline, tasks)
-            all_results.extend(baseline_results)
+        for seed in range(self.num_runs):
+            if seed > 0:
+                console.print(
+                    f"\n[dim]Seed {seed + 1}/{self.num_runs} — "
+                    f"waiting {self.run_delay_s}s before next run...[/dim]"
+                )
+                time.sleep(self.run_delay_s)
+
+            if self.num_runs > 1:
+                console.rule(f"[bold]Seed {seed + 1}/{self.num_runs}[/bold]")
+
+            for baseline in baselines:
+                console.rule(f"[bold blue]Baseline: {baseline}[/bold blue]")
+                baseline_results = self._run_baseline(baseline, tasks)
+                all_results.extend(baseline_results)
 
         return all_results
 
@@ -168,6 +192,8 @@ class BenchmarkRunner:
             baseline=baseline,
             model=self.model,
             runs_dir=self.runs_dir,
+            max_tool_rounds=self.max_tool_rounds,
+            call_delay=self.call_delay,
         )
 
         try:

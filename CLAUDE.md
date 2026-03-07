@@ -24,7 +24,7 @@ formal benchmark comparing three baselines.
 
 ## Current Status
 
-**Second full benchmark run complete. 10 tasks × 3 baselines. loop_reflect = 100%. Results documented below.**
+**15 tasks built. Search-budget ablation complete. Core hypothesis sharpened. mini_015 awaiting validation.**
 
 ### Completed this project so far
 
@@ -204,13 +204,104 @@ formal benchmark comparing three baselines.
   matter on (A) weaker models, or (B) larger codebases where full exploration isn't feasible
   in 15 tool rounds. mini_012 is a keeper; mini_011 needs rethinking.
 
+**Session 10 — search-budget ablation (`--tool-rounds`):**
+- Implemented `--tool-rounds` CLI flag, threaded through full chain:
+  `cli.py` → `BenchmarkRunner` → `build_agent` → `AgentLoop` → `Planner` → `chat_with_tools`.
+- Ran `loop` vs `loop_reflect` on mini_004 + mini_005 + mini_006 at tool_rounds = 15, 8, 4.
+
+  | tool_rounds | loop | loop_reflect | Notes |
+  |---|---|---|---|
+  | 15 | 66.7% (2/3) | 33.3% (1/3) | loop_reflect fails mini_006 — non-determinism |
+  | 8  | 66.7% (2/3) | 66.7% (2/3) | loop_reflect solves mini_006 in 1 iter; loop takes 3 iters for mini_004 |
+  | 4  | **0.0% (0/3)** | **0.0% (0/3)** | LOC changed=0 on all — model produces NO_DIFF, can't explore in 4 rounds |
+
+  Key findings:
+  - **4 rounds → complete collapse**: both baselines produce 0 patches (NO_DIFF). Minimum viable
+    search budget for these 2-3 file tasks is ~8 rounds.
+  - **8 rounds micro-signal**: loop_reflect solved mini_006 (3-file fix) in 1 iter while loop
+    failed it. loop solved mini_004 in 3 iters while loop_reflect failed. Suggests directional
+    advantage from reflection on multi-file tasks, but swamped by single-run variance.
+  - **Single-run variance dominates**: at 15 rounds loop_reflect scored 33% this run vs 100%
+    in session 7. No statistic from any single run is trustworthy.
+  - **Bottom line**: the ablation produced ambiguous results. Need 3× averaged runs to get
+    credible numbers. Quota exhausted trying to run 3×; deferred to next session.
+- Also implemented `--num-runs N` + `--run-delay S` in CLI/BenchmarkRunner for proper
+  averaged benchmarks. Seeds loop over baselines with configurable delay to avoid rate-limit bursts.
+
+  - mini_013 (pipeline_falsy_cascade): validator drops falsy, serializer or-merges.
+    Wrong-file trap (pipeline.py). Built and tested — but single_shot ALSO resolved it in 1 iter.
+  - mini_014 (report_pipeline, 7 files): bug in aggregator.py: `group_key = t.id or t.category`.
+    Issue description implicates formatter.py (wrong-file trap). But the bug was obvious from the
+    inline comment: "Use the transaction's own identifier as the grouping key". Model solved it in
+    0 iterations (never used a tool — went straight from issue description to patch). ALSO too easy.
+  - **Definitive conclusion**: gpt-oss-120b trivially fixes any bug whose location is inferable from
+    the issue description alone (semantically or structurally). Even 7-file repos are not enough if
+    the bug manifests an obvious code smell (like a comment describing it).
+
+**Session 11 — mini_015 + 3× averaged benchmark attempt:**
+- Built mini_015 (event_pipeline, 7 files): cascade falsy bug — 2 bugs in different files.
+  - BUG A (enricher.py): `e.priority = e.priority or defaults.get("priority", 5)` and
+    `e.value = e.value or defaults.get("value", 1.0)` — `or` pattern replaces 0/0.0 with defaults.
+  - BUG B (reducer.py): `if e.priority: b["priorities"].append(e.priority)` — skips 0-priority events.
+  - Issue description is deliberately vague: "category totals and priority ranges are wrong."
+    No mention of enricher or reducer. Wrong-file trap: says "report format looks fine."
+  - Cascade: fixing BUG A makes test_02 pass but tests_03/04/05 still fail because reducer
+    still filters 0-priority events. Model must iterate to find and fix BUG B.
+  - Verified: 4/5 tests fail on buggy code. Fixing enricher-only leaves 3/5 still failing.
+    Both fixes together → all 5 pass.
+  - Status: built but NOT yet tested against model (Cerebras token quota exhausted).
+- **3× averaged benchmark** attempted multiple times — all blocked by daily token quota.
+  Error: `token_quota_exceeded: Tokens per day limit exceeded - too many tokens processed.`
+  Cerebras free tier has a daily TOKEN BUDGET (not just RPD). Heavy benchmarking exhausts it.
+  Retries (30s/60s backoff) do eventually succeed IF the daily budget isn't fully spent —
+  confirmed: mini_004 loop resolved in 313s (1 iteration) after 5 rate-limit retries.
+  But running 3× of 3 tasks × 2 baselines exhausts the budget within the session.
+  `--call-delay 7` helps with per-minute smoothing but cannot extend the daily budget.
+- Added `--call-delay S` parameter (default 0) to CLI, BenchmarkRunner, LLMClient.
+- Added error body to rate-limit retry messages for better diagnostics.
+
+**Session 12 — framing + planning (no code changes):**
+- Attempted 3× benchmark on startup but CEREBRAS_API_KEY was not saved to shell config — failed immediately.
+- Reviewed external analysis (ChatGPT). Key agreements:
+  - Bigger repos alone don't make tasks reflection-critical — it's about *selective search pressure without leaking the invariant*
+  - mini_013/014 are calibration tasks (too easy), not failures — useful as controls
+  - mini_015 is the most promising task built so far; should be validated before spending quota on 3×
+  - Single-run variance is the core problem — replication must be treated as immediate, not deferred
+  - Stay on gpt-oss-120b; don't switch to weaker models (blurs the systems narrative)
+- **Sharpened core hypothesis**: reflection becomes load-bearing when search is scarce and the next action is ambiguous — not universally, not on bigger repos alone
+- **Plan for next session**: validate mini_015 with 3 cheap runs first, then 3× averaged benchmark if it shows signal
+
 ### Next session priority
-1. Keep mini_012 (good task, separates single_shot from iterative)
-2. Redesign or replace mini_011 — single_shot solved it, which means it doesn't serve our goals
-3. For reflection-critical tasks to work, need larger codebases (5+ files) where tool-round
-   budget prevents exhaustive exploration, forcing the model to rely on guidance
-4. OR: test on a weaker model (e.g. llama3.1-8b via Cerebras) where reflection matters more
-5. Run 3× averaged runs of the 10-task standard slice to get stable variance numbers
+
+**Core framing (confirmed with external review):**
+The question is no longer "do reflections help?" — it is:
+**"Under what search constraints does reflection become the load-bearing signal?"**
+Design constraint for new tasks: *selective search pressure without leaking the invariant.*
+
+1. **CEREBRAS_API_KEY must be exported before running** — it is not saved in any shell config file.
+   Add it to ~/.zshenv so it persists across sessions:
+   ```
+   echo 'export CEREBRAS_API_KEY=your_key_here' >> ~/.zshenv
+   ```
+
+2. **Validate mini_015 first** (cheap — 3 runs total before committing full quota):
+   ```
+   patchloop run mini_015 --baseline loop --model gpt-oss-120b --tool-rounds 8 --call-delay 7
+   patchloop run mini_015 --baseline loop_testnames --model gpt-oss-120b --tool-rounds 8 --call-delay 7
+   patchloop run mini_015 --baseline loop_reflect --model gpt-oss-120b --tool-rounds 8 --call-delay 7
+   ```
+   If baseline separation shows → fold mini_015 into 3× averaged run immediately.
+   If single_shot also trivially solves it → calibration task; redesign needed.
+
+3. **3× averaged benchmark** (only after mini_015 validates):
+   ```
+   patchloop bench -t mini_004 -t mini_005 -t mini_006 \
+     -b loop -b loop_reflect --model gpt-oss-120b \
+     --tool-rounds 8 --num-runs 3 --run-delay 30 --call-delay 7
+   ```
+   Single-run results are not trustworthy. Replication is not a "later step" — fold it in immediately.
+
+4. mini_013/014 are calibration/control tasks (too easy for gpt-oss-120b, not part of reflection-critical slice).
 
 ---
 
@@ -398,7 +489,7 @@ DO NOT add tasks that single_shot trivially solves. The delta is the point.
 
 ---
 
-## Mini-Bench v1 Tasks (Current: 12/12)
+## Mini-Bench v1 Tasks (Current: 15/15)
 
 ### Standard slice (mini_001–010) — informative test names
 | ID       | Bug                                    | Difficulty | Expected single_shot |
@@ -414,14 +505,18 @@ DO NOT add tasks that single_shot trivially solves. The delta is the point.
 | mini_009 | retry_after: int-only, crashes on HTTP-date | medium | 3-step fix: blank → HTTP-date → malformed; each step revealed by test failure |
 | mini_010 | parse_line() naive split breaks on quoted , | medium | issue text misleads to trailing-comma; real fix is csv.reader |
 
-### Reflection-critical slice (mini_011–012) — generic test names (test_regression_N)
+### Reflection-critical slice (mini_011–015) — generic test names (test_regression_N)
 Designed so loop_testnames cannot win just from the test name — the conceptual lesson matters.
 | ID       | Bug                                    | Difficulty | Design intent |
 |----------|----------------------------------------|------------|---------------|
 | mini_011 | merge uses `or` (drops falsy), serialize uses `if v` (drops falsy) | hard | Both files share the `falsy≠absent` bug; fixing one still fails 3/4 tests |
 | mini_012 | cache key is `template` only, ignores locale+mode | hard | Issue says "rendering problem"; bug is in cache.py key — wrong-file trap |
+| mini_013 | validator drops falsy (if v), serializer keeps default over record (or-merge) | hard | Wrong-file trap: issue implicates pipeline.py; cascade: fixing validator reveals serializer bug |
+| mini_014 | aggregator uses `t.id or t.category` (groups by ID not category) | hard | 7-file report pipeline; wrong-file trap (issue says formatter). Solved by single_shot (0 iters) |
+| mini_015 | enricher `or`-defaults 0/0.0 fields; reducer `if e.priority` skips 0-priority | hard | 7-file event pipeline; cascade: fix enricher reveals reducer bug; issue is vague |
 
-All 12 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
+All 15 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
+mini_014 NOTE: too easy — model patched it without using any tools. Keep as calibration task only.
 
 ---
 
@@ -471,6 +566,13 @@ All writes are flushed immediately (no buffering) to survive crashes.
   - Run each baseline on a separate day: `patchloop bench -b single_shot`, next day `-b loop`, etc.
   - Use a fresh API key per baseline
   - Use Cerebras (14,400 RPD, auto-configured via CEREBRAS_API_KEY) for reliable full runs
+- **Cerebras token quota**: Free tier has BOTH a request limit (14,400 RPD) AND a daily token budget.
+  Heavy benchmarking exhausts the daily token budget. Error: `token_quota_exceeded`.
+  Retries (30s/60s backoff) DO eventually succeed if the per-minute window clears, but once the
+  DAILY token budget is spent, calls fail until midnight UTC reset.
+  **Rule**: Never make test/warm-up API calls before a benchmark run. Save all daily tokens for the run.
+  **Use `--call-delay 7`** to pace throughput and avoid per-minute throttling during a long benchmark.
+  A 3-task × 2-baseline × 3-seed benchmark takes 1-3 hours with rate-limit pausing but does complete.
 
 ---
 

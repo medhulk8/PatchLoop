@@ -17,6 +17,8 @@ def build_agent(
     baseline: str,
     model: str,
     runs_dir: Path,
+    max_tool_rounds: int = 15,
+    call_delay: float = 0.0,
 ) -> tuple[AgentLoop, LocalEnvironment, RunLogger, str]:
     """
     Build an AgentLoop + Environment + Logger for the given task and baseline.
@@ -34,8 +36,8 @@ def build_agent(
 
     run_id = uuid.uuid4().hex[:8]
     env = LocalEnvironment(task)
-    llm = LLMClient(model=model)
+    llm = LLMClient(model=model, call_delay=call_delay)
     logger = RunLogger(run_id=run_id, task_id=task.task_id, runs_dir=runs_dir)
-    loop = AgentLoop(task=task, env=env, llm=llm, logger=logger, baseline=baseline)
+    loop = AgentLoop(task=task, env=env, llm=llm, logger=logger, baseline=baseline, max_tool_rounds=max_tool_rounds)
 
     return loop, env, logger, run_id

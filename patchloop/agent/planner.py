@@ -115,8 +115,9 @@ class Planner:
     explore the codebase, reason about the bug, then produce a unified diff.
     """
 
-    def __init__(self, llm: LLMClient) -> None:
+    def __init__(self, llm: LLMClient, max_tool_rounds: int = 15) -> None:
         self.llm = llm
+        self.max_tool_rounds = max_tool_rounds
 
     def run(
         self,
@@ -162,6 +163,7 @@ class Planner:
             tools=CODING_TOOLS,
             tool_handler=tool_handler,
             record=record,
+            max_tool_rounds=self.max_tool_rounds,
         )
 
         record.plan = response_text

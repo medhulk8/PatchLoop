@@ -45,6 +45,7 @@ class AgentLoop:
         llm: LLMClient,
         logger: "RunLogger",
         baseline: str = "loop_reflect",
+        max_tool_rounds: int = 15,
     ) -> None:
         self.task = task
         self.env = env
@@ -53,7 +54,7 @@ class AgentLoop:
         self.baseline = baseline
 
         # Agent components
-        self.planner = Planner(llm)
+        self.planner = Planner(llm, max_tool_rounds=max_tool_rounds)
         self.patcher = Patcher()
         self.reflector = Reflector(llm)
 
