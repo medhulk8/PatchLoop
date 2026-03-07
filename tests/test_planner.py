@@ -4,7 +4,8 @@ from pathlib import Path
 
 from patchloop.agent.planner import _extract_failed_tests, build_user_message
 from patchloop.agent.state import IterationRecord, LoopState, Reflection
-from patchloop.environment.task import Task, TestResult
+from patchloop.environment.task import Task
+from patchloop.environment.task import TestResult as TaskTestResult
 
 
 # ------------------------------------------------------------------ #
@@ -42,7 +43,7 @@ def _make_reflection(iteration: int = 1, lesson: str = "Fix the writer too.") ->
 
 def _make_iter_record(passed: bool = False, stdout: str = "") -> IterationRecord:
     record = IterationRecord(iteration=1)
-    record.test_result = TestResult(
+    record.test_result = TaskTestResult(
         passed=passed,
         returncode=0 if passed else 1,
         stdout=stdout,

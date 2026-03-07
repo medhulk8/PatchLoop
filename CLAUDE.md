@@ -171,10 +171,11 @@ These were explicitly agreed upon. Do not change without user confirmation.
 1. **LocalEnvironment first, DockerEnvironment Phase 2.**
    Docker is a drop-in via the same Environment ABC. Don't touch docker_env.py.
 
-2. **Three baselines, same code path:**
-   - `single_shot`: max_iterations=1, no reflection
-   - `loop`: max_iterations=N, no reflection
-   - `loop_reflect`: max_iterations=N, inject ALL prior in-run reflections
+2. **Four baselines, same code path:**
+   - `single_shot`: max_iterations=1, no reflection, no test-name grounding
+   - `loop`: max_iterations=N, no reflection, no test-name grounding
+   - `loop_testnames`: max_iterations=N, no reflection, injects failing test names (ablation)
+   - `loop_reflect`: max_iterations=N, injects ALL prior reflections + failing test names
 
 3. **Reflection injection = ALL prior reflections from the current run.**
    No "most relevant 2-3" — that's overcomplicated for Phase 1.
