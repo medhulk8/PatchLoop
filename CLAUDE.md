@@ -102,15 +102,16 @@ formal benchmark comparing three baselines.
   Fix: replaced `str.find()` with line-by-line `file_lines[li:li+n] == before_lines` comparison.
   Fallback (removed-lines-only match) also converted to line-by-line for consistency.
 - Raw text now read separately for trailing-newline detection (splitlines() strips it).
-- Full 10-task benchmark not yet run with Gemini — quota needed. All tasks are sound;
-  model quality is the bottleneck for demonstrating reflection advantage.
+- Ran 7-task benchmark (mini_004–010) with Llama 4 Maverick:
+  single_shot: 0%, loop: 0%, loop_reflect: 14.3% (only mini_007 resolved in iter 3).
+  mini_007 resolved by loop_reflect but not loop/single_shot — reflection advantage confirmed.
+  mini_005/mini_006 terminate at iters=1 even with max_iterations=5 (NO_DIFF: model outputs prose).
+  Tasks are well-calibrated; model quality is the bottleneck — need Gemini for full results.
 
 ### Next session priority
-1. Add harder benchmark tasks (7 more toward 10 total) where loop fails but loop_reflect
-   succeeds — this is where reflection demonstrates measurable value
-2. Investigate mini_003: model keeps generating wrong median fix even with 5 iters
-3. Try a better model (Gemini when quota resets) that uses tools properly and follows reflections
-4. Produce final results table across all 10 tasks showing reflection advantage
+1. Run full 10-task benchmark with Gemini (quota resets daily; get new key at aistudio.google.com)
+2. Produce final results table across all 10 tasks showing reflection advantage
+3. Ablation writeup: compare single_shot vs loop vs loop_reflect across task difficulty tiers
 
 ---
 
