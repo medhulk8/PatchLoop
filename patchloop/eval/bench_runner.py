@@ -100,7 +100,7 @@ class BenchmarkRunner:
         baselines = baselines or list(BASELINES)
         tasks = self.load_tasks(task_ids)
 
-        runs_label = f" × {self.num_runs} seeds" if self.num_runs > 1 else ""
+        runs_label = f" × {self.num_runs} repetitions" if self.num_runs > 1 else ""
         console.print(
             f"\n[bold]PatchLoop Benchmark[/bold] | "
             f"{len(tasks)} tasks × {len(baselines)} baselines{runs_label} "
@@ -109,16 +109,16 @@ class BenchmarkRunner:
 
         all_results: list[TaskResult] = []
 
-        for seed in range(self.num_runs):
-            if seed > 0:
+        for rep in range(self.num_runs):
+            if rep > 0:
                 console.print(
-                    f"\n[dim]Seed {seed + 1}/{self.num_runs} — "
+                    f"\n[dim]Repetition {rep + 1}/{self.num_runs} — "
                     f"waiting {self.run_delay_s}s before next run...[/dim]"
                 )
                 time.sleep(self.run_delay_s)
 
             if self.num_runs > 1:
-                console.rule(f"[bold]Seed {seed + 1}/{self.num_runs}[/bold]")
+                console.rule(f"[bold]Repetition {rep + 1}/{self.num_runs}[/bold]")
 
             for baseline in baselines:
                 console.rule(f"[bold blue]Baseline: {baseline}[/bold blue]")

@@ -18,7 +18,7 @@ Given a buggy Python repo and an issue description, it autonomously:
 6. Repeats until tests pass, iteration cap, time limit, or stuck
 
 The goal is to demonstrate **measurable improvement** from reflection via a
-formal benchmark comparing three baselines.
+formal benchmark comparing four baselines.
 
 ---
 

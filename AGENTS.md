@@ -18,7 +18,7 @@ Given a buggy Python repo and an issue description, it autonomously:
 6. Repeats until tests pass, iteration cap, time limit, or stuck
 
 The goal is to demonstrate **measurable improvement** from reflection via a
-formal benchmark comparing three baselines.
+formal benchmark comparing four baselines.
 
 ---
 
@@ -46,7 +46,7 @@ These were explicitly agreed upon. Do not change without user confirmation.
 1. **LocalEnvironment first, DockerEnvironment Phase 2.**
    Docker is a drop-in via the same Environment ABC. Don't touch docker_env.py.
 
-2. **Three baselines, same code path:**
+2. **Four baselines, same code path:**
    - `single_shot`: max_iterations=1, no reflection
    - `loop`: max_iterations=N, no reflection
    - `loop_reflect`: max_iterations=N, inject ALL prior in-run reflections
