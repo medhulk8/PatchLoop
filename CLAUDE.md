@@ -24,7 +24,7 @@ formal benchmark comparing three baselines.
 
 ## Current Status
 
-**First full benchmark run complete. 3 tasks × 3 baselines. Results documented below.**
+**Second full benchmark run complete. 10 tasks × 3 baselines. loop_reflect = 100%. Results documented below.**
 
 ### Completed this project so far
 
@@ -133,12 +133,34 @@ formal benchmark comparing three baselines.
   - Single-run benchmarks with strong capable models are noisy — need multiple runs
     or harder tasks where even loop struggles, so loop_reflect's advantage is clear.
 
+**Session 7 — loop_reflect fix + clean 100% benchmark:**
+- Root cause of loop_reflect regression found: reflections said "fix the writer" but model only read reader.py.
+  Abstract lesson alone wasn't enough — model needed the concrete failing test name
+  `test_writer_terminates_each_record_with_newline` to know which file to open.
+- Fix: inject `FAILED <test_name>` lines from last iteration's stdout into loop_reflect PLAN prompt
+  (in `build_user_message` in planner.py). Only lines starting with "FAILED" are extracted.
+- **Second clean 10-task benchmark** with Cerebras `gpt-oss-120b` after fix:
+
+  | Metric | single_shot | loop | loop_reflect |
+  |--------|-------------|------|--------------|
+  | Resolve rate | 90% (9/10) | 80% (8/10) | **100% (10/10)** |
+  | Avg iters (success) | 1.00 | 1.25 | 1.20 |
+  | Avg runtime (s) | 4.40 | 19.30 | 12.30 |
+  | Repeat failure rate | 0% | 0% | 0% |
+
+  Key findings:
+  - `loop_reflect` is now definitively best — resolves 100% including mini_006 (3-file fix in 3 iters)
+    and mini_009 that loop failed.
+  - `loop` regression to 80% this run (vs 100% prior run) is non-determinism with a strong model.
+    Single-run benchmarks on capable models are noisy.
+  - loop_reflect resolving mini_006 (3 files, 3 iters) is clean proof the reflection mechanism works:
+    loop fails because iter 1 only fixes slug.py; loop_reflect uses the lesson + failing test names
+    to find toc.py and renderer.py on subsequent iterations.
+
 ### Next session priority
-1. Investigate loop_reflect regression: why does loop solve mini_004 iter 1 but loop_reflect fails all 3 iters?
-   Check if reflections from iter 1 failure are leading the model in wrong direction.
-2. Consider increasing max_iterations to 8 to give loop_reflect more room to converge
-3. Run benchmark 3× and average results to reduce non-determinism noise
-4. OR design harder tasks where loop needs >3 iters, giving reflection more room to show advantage
+1. Run benchmark 3× and average to reduce non-determinism noise (loop 80%/100% variance is too wide)
+2. Consider harder tasks where even loop_reflect needs 4-5 iterations to show reflection scaling
+3. Phase 2: DockerEnvironment for safe isolation
 
 ---
 

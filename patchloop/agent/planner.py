@@ -40,9 +40,28 @@ def build_user_message(task: Task, state: LoopState) -> str:
             f"- **Iteration {r.iteration}**: {r.lesson}"
             for r in state.reflections
         )
+
+        # Include the failing test names from the last iteration so the model
+        # can correlate the lesson with the specific file it needs to fix.
+        # E.g. "FAILED test_writer_terminates_each_record_with_newline" tells
+        # the model to read writer.py — something the abstract lesson alone
+        # may not convey clearly enough.
+        failed_tests = ""
+        if state.iterations:
+            last_result = state.iterations[-1].test_result
+            if last_result and not last_result.passed:
+                failed_lines = [
+                    line for line in (last_result.stdout or "").splitlines()
+                    if line.startswith("FAILED")
+                ]
+                if failed_lines:
+                    failed_tests = "\n\nStill-failing tests:\n" + "\n".join(
+                        f"  {line}" for line in failed_lines
+                    )
+
         parts.append(
             "## Lessons from previous failed attempts\n\n"
-            "Do NOT repeat these mistakes:\n\n" + lessons
+            "Do NOT repeat these mistakes:\n\n" + lessons + failed_tests
         )
 
     parts.append(
