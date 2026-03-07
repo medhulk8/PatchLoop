@@ -9,7 +9,7 @@ from patchloop.environment.task import Task
 from patchloop.llm.client import LLMClient
 from patchloop.observability.logger import RunLogger
 
-BASELINES = ("single_shot", "loop", "loop_reflect")
+BASELINES = ("single_shot", "loop", "loop_testnames", "loop_reflect")
 
 
 def build_agent(

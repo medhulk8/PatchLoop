@@ -25,13 +25,37 @@ Rules:
 """
 
 
+def _extract_failed_tests(state: LoopState) -> str:
+    """
+    Extract FAILED test lines from the last iteration's stdout.
+
+    Returns a formatted string ready to append to a prompt section,
+    or empty string if there are no failed lines to report.
+    Capped at 10 lines to prevent prompt bloat on large test suites.
+    """
+    if not state.iterations:
+        return ""
+    last_result = state.iterations[-1].test_result
+    if not last_result or last_result.passed:
+        return ""
+    failed_lines = [
+        line for line in (last_result.stdout or "").splitlines()
+        if line.startswith("FAILED")
+    ][:10]
+    if not failed_lines:
+        return ""
+    return "\n\nStill-failing tests:\n" + "\n".join(f"  {line}" for line in failed_lines)
+
+
 def build_user_message(task: Task, state: LoopState) -> str:
     """
     Build the user message for the PLAN phase.
 
     On iteration 0: just the issue.
-    On iteration >= 1 with reflections: prepend "Lessons learned" from
-    prior failed attempts. This is the core of the in-run reflection mechanism.
+    On iteration >= 1:
+    - loop_reflect: inject reflection lessons + failing test names (grounding)
+    - loop_testnames: inject only failing test names (ablation — no lessons)
+    - loop / single_shot: issue only
     """
     parts = [f"## Issue\n\n{task.issue.strip()}"]
 
@@ -40,29 +64,18 @@ def build_user_message(task: Task, state: LoopState) -> str:
             f"- **Iteration {r.iteration}**: {r.lesson}"
             for r in state.reflections
         )
-
-        # Include the failing test names from the last iteration so the model
-        # can correlate the lesson with the specific file it needs to fix.
-        # E.g. "FAILED test_writer_terminates_each_record_with_newline" tells
-        # the model to read writer.py — something the abstract lesson alone
-        # may not convey clearly enough.
-        failed_tests = ""
-        if state.iterations:
-            last_result = state.iterations[-1].test_result
-            if last_result and not last_result.passed:
-                failed_lines = [
-                    line for line in (last_result.stdout or "").splitlines()
-                    if line.startswith("FAILED")
-                ]
-                if failed_lines:
-                    failed_tests = "\n\nStill-failing tests:\n" + "\n".join(
-                        f"  {line}" for line in failed_lines
-                    )
-
         parts.append(
             "## Lessons from previous failed attempts\n\n"
-            "Do NOT repeat these mistakes:\n\n" + lessons + failed_tests
+            "Do NOT repeat these mistakes:\n\n" + lessons + _extract_failed_tests(state)
         )
+    elif state.iterations and state.baseline == "loop_testnames":
+        failed_tests = _extract_failed_tests(state)
+        if failed_tests:
+            parts.append(
+                "## Still-failing tests from last attempt\n\n"
+                "Your previous patch did not pass all tests. "
+                "Focus on these:" + failed_tests
+            )
 
     parts.append(
         "## Task\n\n"
