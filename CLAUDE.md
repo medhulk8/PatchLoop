@@ -356,9 +356,14 @@ All writes are flushed immediately (no buffering) to survive crashes.
   must not have external dependencies beyond stdlib + pytest.
 - mini_001's original retry.py had a non-bug. Fixed: now uses a single
   `except Exception` clause that incorrectly catches PermanentError.
-- gemini-2.5-flash free tier has low RPD (requests per day). If quota
-  hits during a bench run, the run errors with 429. Wait until next day
-  or use a fresh API key from aistudio.google.com.
+- gemini-2.5-flash free tier has low RPD (~50 req/day) and RPM (10 req/min).
+  A full 10-task × 3-baseline benchmark consumes 100-200+ API calls and will
+  exhaust the daily quota midway through (loop and loop_reflect see all 429s).
+  **Workarounds:**
+  - Run each baseline on a separate day: `patchloop bench -b single_shot`, next day `-b loop`, etc.
+  - Use a fresh API key per baseline
+  - Rate limit retry backoff is now 60s base (guarantees RPM window reset)
+  - Inter-task delay of 15s added to bench_runner to spread RPM load
 
 ---
 

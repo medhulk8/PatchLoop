@@ -143,7 +143,7 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
-        delay = 5.0
+        delay = 60.0
         for attempt in range(_retries + 1):
             try:
                 response = self._client.chat.completions.create(**kwargs)
@@ -153,7 +153,7 @@ class LLMClient:
                     raise
                 print(f"  [rate limit] waiting {delay:.0f}s before retry {attempt + 1}/{_retries}...")
                 time.sleep(delay)
-                delay *= 2   # exponential backoff: 5 → 10 → 20 → 40
+                delay = min(delay * 2, 120.0)  # backoff: 60 → 120 → 120 → 120
 
         if record is not None and response.usage:
             record.llm_calls += 1
