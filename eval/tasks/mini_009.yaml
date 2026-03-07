@@ -1,0 +1,14 @@
+task_id: mini_009
+repo: repos/mini_009
+issue: |
+  retry_after_seconds() crashes with a ValueError when the Retry-After header
+  is empty or blank. Fix it to return 0 for missing or empty values instead
+  of raising an exception.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: medium
+tags:
+  - http
+  - dual-format
+  - hidden-constraint

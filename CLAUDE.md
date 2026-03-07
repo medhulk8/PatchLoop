@@ -287,11 +287,18 @@ DO NOT add tasks that single_shot trivially solves. The delta is the point.
 
 | ID       | Bug                                    | Difficulty | Expected single_shot |
 |----------|----------------------------------------|------------|----------------------|
-| mini_001 | retry() catches PermanentError         | medium     | likely fails         |
-| mini_002 | paginate() off-by-one (end slice)      | easy       | may pass             |
-| mini_003 | median() wrong for even-length inputs  | easy       | likely passes        |
+| mini_001 | retry() catches PermanentError              | medium | loop fixes it                                            |
+| mini_002 | paginate() off-by-one (end slice)           | easy   | single_shot may fix it                                   |
+| mini_003 | median() wrong for even-length inputs       | easy   | model-dependent                                          |
+| mini_004 | jsonl reader drops last record + writer missing \n | hard | fixing reader reveals writer bug via test output   |
+| mini_005 | merge_config() shallow merge loses siblings | hard   | partial fix mutates input — reflection encodes "go deeper" |
+| mini_006 | anchor normalization duplicated in 3 files  | hard   | fixing slug.py alone leaves toc.py + renderer.py broken  |
+| mini_007 | safe_join() bans ALL nested paths           | medium | removing guard breaks traversal tests — must normalize   |
+| mini_008 | group_rows() uses groupby on non-contiguous | medium | sort fix breaks order tests — must use dict accumulation |
+| mini_009 | retry_after: int-only, crashes on HTTP-date | medium | 3-step fix: blank → HTTP-date → malformed; each step revealed by test failure |
+| mini_010 | parse_line() naive split breaks on quoted , | medium | issue text misleads to trailing-comma; real fix is csv.reader |
 
-Need 7 more tasks. Target difficulties: 3 easy, 4 medium, 3 hard.
+All 10 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
 
 ---
 

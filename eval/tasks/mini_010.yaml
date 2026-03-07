@@ -1,0 +1,13 @@
+task_id: mini_010
+repo: repos/mini_010
+issue: |
+  parse_line() splits on every comma, which breaks fields that contain commas
+  inside quoted strings. Fix the parser so quoted fields are handled correctly.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: medium
+tags:
+  - csv
+  - quoting
+  - stdlib
