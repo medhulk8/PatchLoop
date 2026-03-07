@@ -369,8 +369,9 @@ DO NOT add tasks that single_shot trivially solves. The delta is the point.
 
 ---
 
-## Mini-Bench v1 Tasks (Current: 3/10)
+## Mini-Bench v1 Tasks (Current: 12/12)
 
+### Standard slice (mini_001–010) — informative test names
 | ID       | Bug                                    | Difficulty | Expected single_shot |
 |----------|----------------------------------------|------------|----------------------|
 | mini_001 | retry() catches PermanentError              | medium | loop fixes it                                            |
@@ -384,7 +385,14 @@ DO NOT add tasks that single_shot trivially solves. The delta is the point.
 | mini_009 | retry_after: int-only, crashes on HTTP-date | medium | 3-step fix: blank → HTTP-date → malformed; each step revealed by test failure |
 | mini_010 | parse_line() naive split breaks on quoted , | medium | issue text misleads to trailing-comma; real fix is csv.reader |
 
-All 10 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
+### Reflection-critical slice (mini_011–012) — generic test names (test_regression_N)
+Designed so loop_testnames cannot win just from the test name — the conceptual lesson matters.
+| ID       | Bug                                    | Difficulty | Design intent |
+|----------|----------------------------------------|------------|---------------|
+| mini_011 | merge uses `or` (drops falsy), serialize uses `if v` (drops falsy) | hard | Both files share the `falsy≠absent` bug; fixing one still fails 3/4 tests |
+| mini_012 | cache key is `template` only, ignores locale+mode | hard | Issue says "rendering problem"; bug is in cache.py key — wrong-file trap |
+
+All 12 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
 
 ---
 
