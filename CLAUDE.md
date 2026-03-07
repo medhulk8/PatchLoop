@@ -157,9 +157,30 @@ formal benchmark comparing three baselines.
     loop fails because iter 1 only fixes slug.py; loop_reflect uses the lesson + failing test names
     to find toc.py and renderer.py on subsequent iterations.
 
+**Session 8 — loop_testnames ablation:**
+- Added `loop_testnames` baseline: injects failing test names but no reflection lessons.
+  This isolates whether gains come from test-name grounding or structured reflection.
+- **Ablation run** (10 tasks × 4 baselines, Cerebras gpt-oss-120b):
+
+  | Baseline | Resolve rate | Avg iters | Repeat failures |
+  |---|---|---|---|
+  | single_shot | 90% | 1.00 | 0% |
+  | loop | **100%** | 1.10 | 0% |
+  | loop_testnames | **100%** | 1.30 | 7.7% |
+  | loop_reflect | 90% | 1.11 | 0% |
+
+  Key finding: `loop_testnames` = 100% with no reflection lessons — matches loop.
+  `loop_reflect` = 90% this run (mini_010 failed, non-determinism).
+  Suggests failing test names are the primary grounding signal, not structured lessons.
+  However, single-run variance is too high to conclude this definitively.
+
+  Revised framing: the real insight is "environment grounding > abstract reasoning" —
+  raw `FAILED test_xxx` names are more actionable than conceptual lesson summaries.
+
 ### Next session priority
-1. Run benchmark 3× and average to reduce non-determinism noise (loop 80%/100% variance is too wide)
-2. Consider harder tasks where even loop_reflect needs 4-5 iterations to show reflection scaling
+1. Run all 4 baselines 3× and average — variance too high for strong claims
+2. If loop_testnames consistently ≈ loop, design harder tasks where conceptual reflection
+   is needed (subtle bugs where test names alone don't point to the root cause)
 3. Phase 2: DockerEnvironment for safe isolation
 
 ---
