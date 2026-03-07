@@ -108,20 +108,37 @@ formal benchmark comparing three baselines.
   mini_005/mini_006 terminate at iters=1 even with max_iterations=5 (NO_DIFF: model outputs prose).
   Tasks are well-calibrated; model quality is the bottleneck — need Gemini for full results.
 
-**Session 6 — File pre-loading + Cerebras provider:**
-- Planner now pre-loads all `.py` files from the workspace into the initial PLAN message.
-  `_build_repo_context(env)` reads all Python files and injects them as a "Repository Files"
-  section. Model starts with full context → tool-call rounds drop from ~8 to ~1-2 per iter.
-  Tools still available as optional fallback (model can call them if needed).
-  System prompt updated to reflect that files are already provided.
+**Session 6 — Cerebras provider + first clean 10-task benchmark:**
 - Added Cerebras as a provider: set `CEREBRAS_API_KEY` and the base URL auto-configures to
-  `https://api.cerebras.ai/v1`. Recommended model: `llama3.1-70b` (14,400 RPD free tier).
-  See LLM Provider Setup section for commands.
+  `https://api.cerebras.ai/v1`. Available model: `gpt-oss-120b` (14,400 RPD free tier).
+- Tried file pre-loading (inject all .py files into PLAN message) — abandoned because it
+  let single_shot "cheat" by seeing all files at once, defeating tasks designed around
+  iterative test-feedback discovery (mini_004 writer bug, mini_006 3-file fix). Reverted.
+- **First clean 10-task benchmark** with Cerebras `gpt-oss-120b`:
+
+  | Metric | single_shot | loop | loop_reflect |
+  |--------|-------------|------|--------------|
+  | Resolve rate | 90% (9/10) | **100% (10/10)** | 90% (9/10) |
+  | Avg iters (success) | 1.00 | 1.30 | 1.00 |
+  | Repeat failure rate | 0% | 0% | 16.7% |
+
+  Findings:
+  - `loop > single_shot` (100% vs 90%) ✅ — the iterative feedback mechanism works.
+    mini_004 (jsonl contract) fails single_shot (only fixes reader) but loop catches
+    the writer bug via test failure output. This is the core signal working.
+  - `loop_reflect = single_shot` (90%) — reflection is not helping on this model.
+    mini_004 fails loop_reflect in 3 iters despite loop solving it in 1.
+    The loop_reflect result appears to be partly LLM non-determinism: loop's iter 1
+    succeeds while loop_reflect's iter 1 (same prompt, no reflections yet) fails.
+  - Single-run benchmarks with strong capable models are noisy — need multiple runs
+    or harder tasks where even loop struggles, so loop_reflect's advantage is clear.
 
 ### Next session priority
-1. Test Cerebras with `patchloop run mini_001 --model llama3.1-70b` to verify tool use quality
-2. Run full 10-task benchmark with Cerebras if quality is good
-3. Produce final results table across all 10 tasks showing reflection advantage
+1. Investigate loop_reflect regression: why does loop solve mini_004 iter 1 but loop_reflect fails all 3 iters?
+   Check if reflections from iter 1 failure are leading the model in wrong direction.
+2. Consider increasing max_iterations to 8 to give loop_reflect more room to converge
+3. Run benchmark 3× and average results to reduce non-determinism noise
+4. OR design harder tasks where loop needs >3 iters, giving reflection more room to show advantage
 
 ---
 
@@ -388,13 +405,14 @@ export GEMINI_API_KEY=your_key_here
 ```
 Default model: `gemini-2.5-flash` (free, confirmed working March 2026)
 
-### Alternative: Cerebras (also free — 14,400 RPD)
+### Alternative: Cerebras (also free — 14,400 RPD) ← recommended for benchmarks
 ```bash
 export CEREBRAS_API_KEY=your_cerebras_key
-# Base URL auto-configured. Recommended model:
-patchloop run mini_001 --model llama3.1-70b
-patchloop bench --model llama3.1-70b
+# Base URL auto-configured to https://api.cerebras.ai/v1
+patchloop run mini_001 --model gpt-oss-120b
+patchloop bench --model gpt-oss-120b
 ```
+Available models: gpt-oss-120b (best), llama3.1-8b (fast), qwen-3-235b-a22b-instruct-2507
 Get free key at: https://cloud.cerebras.ai
 
 ### Alternative: Groq (also free — 14,400 RPD)
