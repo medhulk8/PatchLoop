@@ -55,6 +55,12 @@ class LocalEnvironment(Environment):
     # ------------------------------------------------------------------ #
 
     def setup(self) -> None:
+        if self.task.commit is not None:
+            raise NotImplementedError(
+                f"task.commit pinning is not yet supported in LocalEnvironment "
+                f"(task: {self.task.task_id}, commit: {self.task.commit}). "
+                "Implement via git archive or .git copy in Phase 2."
+            )
         self._tmpdir = tempfile.TemporaryDirectory(
             prefix=f"patchloop_{self.task.task_id}_"
         )

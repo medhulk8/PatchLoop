@@ -24,18 +24,18 @@ formal benchmark comparing three baselines.
 
 ## Current Status
 
-**End-to-end WORKS. mini_001 and mini_003 resolve in single_shot.**
+**First full benchmark run complete. 3 tasks × 3 baselines.**
 
-Bugs fixed this session:
-- Switched default model: gemini-1.5-flash (deprecated) → gemini-2.5-flash
-- Removed `required: []` empty array from list_files tool schema (Gemini rejects it)
-- Fixed `model_dump(exclude_unset=False)` → `model_dump(exclude_none=True, exclude_unset=True)`
-  (null fields like "annotations", "audio" in tool_calls message caused 400 errors)
-- Replaced `git apply` with pure Python unified diff applier (_apply_unified_diff in git_ops.py)
-  git apply was mysteriously failing on macOS despite correct patch content
+| Metric | single_shot | loop | loop_reflect |
+|--------|-------------|------|--------------|
+| Resolve rate | 33% (1/3) | 67% (2/3) | 67% (2/3) |
+| Repeat failure rate | 0% | 0% | 42.9% |
+| Avg runtime (s) | 28 | 30 | 107 |
 
-Next session priority: run mini_002, then run full benchmark across all 3 baselines,
-then expand Mini-Bench to 10 tasks.
+Key findings: loop beats single_shot as designed. Reflection does not yet improve
+resolve rate on 3 easy tasks — need harder tasks where the loop itself fails.
+
+Next priority: add 7 harder benchmark tasks, try a better model (Gemini when quota resets).
 
 ---
 
@@ -245,16 +245,13 @@ All writes are flushed immediately (no buffering) to survive crashes.
 
 ## Known Issues / Gotchas
 
-- `pyproject.toml` build-backend must be `setuptools.build_meta` not
-  `setuptools.backends.legacy:build` (already fixed, don't change it back).
+- `Task.commit` is not implemented. `LocalEnvironment.setup()` raises `NotImplementedError`
+  if a task YAML sets `commit:`. No current tasks use it. Deferred to Phase 2.
+- `pyproject.toml` build-backend must be `setuptools.build_meta` (already fixed, don't change).
 - PEP 668: never pip install without a venv on this machine.
-- Tasks run with the venv's pytest, but LocalEnvironment runs test_cmd
-  via subprocess in the workspace — the workspace uses whatever `pytest`
-  is on PATH inside the sandbox. If setup_cmd is None, the task repo
-  must not have external dependencies beyond stdlib + pytest.
-- mini_001's original retry.py had a non-bug (the except PermanentError
-  clause was correct). Fixed: now uses a single `except Exception` clause
-  that incorrectly catches PermanentError.
+- LocalEnvironment runs test_cmd via subprocess — the workspace uses whatever `pytest`
+  is on PATH. Task repos must not have external dependencies if setup_cmd is None.
+- gemini-2.5-flash free tier has 20 req/day limit. Use Groq as fallback (see LLM Provider Setup).
 
 ---
 

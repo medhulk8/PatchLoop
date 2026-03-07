@@ -320,10 +320,9 @@ All writes are flushed immediately (no buffering) to survive crashes.
 
 ## Known Issues / Gotchas
 
-- `Task.commit` field is defined but never applied. If a task YAML specifies `commit: <sha>`,
-  it's silently ignored — the repo is always copied at HEAD. Implementing it requires copying
-  the source `.git` or using `git archive` at the given SHA. Low urgency: no current tasks
-  use this field. Defer to Phase 2.
+- `Task.commit` field is not yet implemented. `LocalEnvironment.setup()` raises
+  `NotImplementedError` if a task YAML specifies `commit: <sha>`. No current tasks use it.
+  Implementation requires `git archive` or copying `.git`. Deferred to Phase 2.
 
 
 - `pyproject.toml` build-backend must be `setuptools.build_meta` not
