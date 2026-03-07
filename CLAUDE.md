@@ -177,11 +177,40 @@ formal benchmark comparing three baselines.
   Revised framing: the real insight is "environment grounding > abstract reasoning" —
   raw `FAILED test_xxx` names are more actionable than conceptual lesson summaries.
 
+**Session 9 — reflection-critical task slice (mini_011, mini_012):**
+- Added 2 new tasks with generic test names (test_regression_N) and cross-file conceptual bugs.
+- mini_011 (falsy_config_roundtrip): merge.py + serialize.py both treat falsy as absent.
+  mini_012 (cache_key_missing_dimension): cache.py ignores locale+mode in key; issue implicates render.py.
+- **Result** (2 tasks × 4 baselines):
+
+  | Baseline | mini_011 | mini_012 | Resolve rate |
+  |---|---|---|---|
+  | single_shot | RESOLVED (1 iter) | FAILED | 50% |
+  | loop | RESOLVED (2 iters) | RESOLVED (1 iter) | 100% |
+  | loop_testnames | RESOLVED (1 iter) | RESOLVED (1 iter) | 100% |
+  | loop_reflect | RESOLVED (1 iter) | RESOLVED (1 iter) | 100% |
+
+  Key findings:
+  - mini_012 cleanly separates single_shot (FAILED) from all iterative baselines (RESOLVED) — confirms
+    the iteration loop is necessary to find the cache key bug after failing on render.py.
+  - mini_011 single_shot resolved: gpt-oss-120b read both files and fixed both bugs in one shot.
+    Task isn't hard enough for this model. May need redesign or replacement.
+  - All iterative baselines remain equivalent (100%) — consistent with the ablation finding.
+    For this capable model on small repos, iteration alone is sufficient; structured reflection
+    does not add measurable value over plain test-name grounding.
+
+  Honest conclusion: for gpt-oss-120b on 2-3 file repos, the model re-reads all code after
+  failure and resolves issues without needing structured lessons. Reflection would likely
+  matter on (A) weaker models, or (B) larger codebases where full exploration isn't feasible
+  in 15 tool rounds. mini_012 is a keeper; mini_011 needs rethinking.
+
 ### Next session priority
-1. Run all 4 baselines 3× and average — variance too high for strong claims
-2. If loop_testnames consistently ≈ loop, design harder tasks where conceptual reflection
-   is needed (subtle bugs where test names alone don't point to the root cause)
-3. Phase 2: DockerEnvironment for safe isolation
+1. Keep mini_012 (good task, separates single_shot from iterative)
+2. Redesign or replace mini_011 — single_shot solved it, which means it doesn't serve our goals
+3. For reflection-critical tasks to work, need larger codebases (5+ files) where tool-round
+   budget prevents exhaustive exploration, forcing the model to rely on guidance
+4. OR: test on a weaker model (e.g. llama3.1-8b via Cerebras) where reflection matters more
+5. Run 3× averaged runs of the 10-task standard slice to get stable variance numbers
 
 ---
 
