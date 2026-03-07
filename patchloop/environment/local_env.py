@@ -61,9 +61,9 @@ class LocalEnvironment(Environment):
         self._workdir = Path(self._tmpdir.name) / "repo"
         self._copy_repo()
         self._git = GitOps(self._workdir)
-        self._snapshot_sha = self._init_git_snapshot()
         if self.task.setup_cmd:
             self._run_setup()
+        self._snapshot_sha = self._init_git_snapshot()
 
     def teardown(self) -> None:
         if self._tmpdir:

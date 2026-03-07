@@ -1,6 +1,6 @@
-# CLAUDE.md — PatchLoop
+# AGENTS.md — PatchLoop
 
-Memory and guidance file for Claude Code. Updated after each session.
+Memory and guidance file for Codex. Updated after each session.
 Read this at the start of every session before touching any code.
 
 ---
@@ -11,7 +11,7 @@ Read this at the start of every session before touching any code.
 
 Given a buggy Python repo and an issue description, it autonomously:
 1. Explores the codebase using tools (read_file, list_files, search_code)
-2. Proposes a unified diff patch via LLM
+2. Proposes a unified diff patch via Codex
 3. Applies the patch and runs pytest
 4. Analyzes failures and generates structured reflections
 5. Injects those reflections into the next attempt ("lessons learned")
@@ -24,79 +24,18 @@ formal benchmark comparing three baselines.
 
 ## Current Status
 
-**First full benchmark run complete. 3 tasks × 3 baselines. Results documented below.**
+**End-to-end WORKS. mini_001 and mini_003 resolve in single_shot.**
 
-### Completed this project so far
-
-**Session 1 — Core build:**
-- Full skeleton implemented and pushed to GitHub
-- All phases: PLAN → APPLY_PATCH → RUN_TESTS → ANALYZE_FAILURE → REFLECT → DECIDE_NEXT
-- 3 benchmark tasks: mini_001, mini_002, mini_003
-- RunLogger, IterationRecord, Reflection, LoopState all wired up
-
-**Session 2 — End-to-end fixes:**
+Bugs fixed this session:
 - Switched default model: gemini-1.5-flash (deprecated) → gemini-2.5-flash
-- Removed `required: []` from list_files tool schema (Gemini rejects empty arrays)
-- Fixed `model_dump(exclude_none=True, exclude_unset=True)` to strip null fields
-  from tool_calls messages (caused 400 INVALID_ARGUMENT from Gemini)
-- Replaced `git apply` with pure Python `_apply_unified_diff()` in git_ops.py
-  (git apply was failing on macOS despite correct patch content)
-- First successful end-to-end runs: mini_001 ✅, mini_003 ✅
+- Removed `required: []` empty array from list_files tool schema (Gemini rejects it)
+- Fixed `model_dump(exclude_unset=False)` → `model_dump(exclude_none=True, exclude_unset=True)`
+  (null fields like "annotations", "audio" in tool_calls message caused 400 errors)
+- Replaced `git apply` with pure Python unified diff applier (_apply_unified_diff in git_ops.py)
+  git apply was mysteriously failing on macOS despite correct patch content
 
-**Session 3 — Code review fixes (Codex review):**
-- STUCK detection: track `last_error_signature`; only increment `consecutive_repeats`
-  when current sig == previous. Alternating failures no longer falsely trigger STUCK.
-- `iterations_used`: changed from `state.iteration` (0-indexed, never incremented on
-  success) to `len(state.iterations)`. Was showing "0/5" on first-attempt resolve.
-- LOC metric: fixed operator precedence bug — parenthesized `(+/-) and not (+++/---)`.
-  `+++` header lines were being counted as added lines.
-- `repeated_failure_count`: use `Counter` + `sum(max(count-1,0))` — clean and correct.
-- Path traversal in `read_file`: resolve + `is_relative_to(workdir)` guard.
-- Lint: ruff auto-fixed unused imports and ambiguous variable names.
-- `list_files` glob escape: filter out-of-workdir matches via `is_relative_to`.
-- `git_diff` drop bug: simplified from `staged or unstaged` to `git diff <ref>`.
-- `loc_changed` was always 0: pass `_snapshot_sha` as ref so diff compares against
-  clean baseline, not just uncommitted edits (always empty after git_commit).
-- Patch-path escape in `_apply_unified_diff`: resolve + `is_relative_to` guard.
-- Removed dead `TerminationReason.APPLY_FAILED` enum value (was never used; apply
-  failures correctly route to DECIDE_NEXT to allow retry).
-- `IterationRecord.close()` made idempotent: guard with `if ended_at is not None`.
-  Was being called twice on apply failure (once in _handle_apply_patch, once in
-  _handle_decide_next), giving slightly wrong iteration timing.
-
-**Session 4 — Groq migration + first full benchmark run:**
-- Migrated from Gemini (20 req/day free tier, exhausted) to Groq (14,400/day free).
-  Default provider stays Gemini; use `--model` + env vars to target Groq.
-- Groq models sometimes skip tool calls and output text → Groq raises `tool_use_failed`
-  (HTTP 400). Fixed: catch `BadRequestError` in `chat_with_tools`, extract
-  `body["failed_generation"]` (model's actual text), return it so diff extractor works.
-  Key: `e.body` from Groq IS the error dict directly (no `"error"` wrapper key).
-- `_apply_unified_diff` fallback: when full context match fails, try matching just the
-  removed (`-`) lines. Handles patches where context lines are hallucinated (model
-  skipped tools) but changed lines are correct.
-- **First full benchmark run** with `meta-llama/llama-4-maverick-17b-128e-instruct`:
-
-  | Metric | single_shot | loop | loop_reflect |
-  |--------|-------------|------|--------------|
-  | Resolve rate | 33% (1/3) | 67% (2/3) | 67% (2/3) |
-  | Repeat failure rate | 0% | 0% | 42.9% |
-  | Avg runtime (s) | 28 | 30 | 107 |
-
-  Findings:
-  - `loop` improves significantly over `single_shot` (as designed)
-  - `loop_reflect` doesn't improve resolve rate on these 3 easy tasks — the reflection
-    mechanism accumulates lessons (42.9% repeat rate shows cycling), but tasks aren't
-    hard enough or model doesn't follow reflections well enough to show benefit
-  - mini_003 (median even-length) fails all baselines — model generates consistently
-    wrong fix even across 5 iterations with reflections
-  - To show reflection benefit we need harder tasks where loop fails but loop_reflect succeeds
-
-### Next session priority
-1. Add harder benchmark tasks (7 more toward 10 total) where loop fails but loop_reflect
-   succeeds — this is where reflection demonstrates measurable value
-2. Investigate mini_003: model keeps generating wrong median fix even with 5 iters
-3. Try a better model (Gemini when quota resets) that uses tools properly and follows reflections
-4. Produce final results table across all 10 tasks showing reflection advantage
+Next session priority: run mini_002, then run full benchmark across all 3 baselines,
+then expand Mini-Bench to 10 tasks.
 
 ---
 
@@ -127,10 +66,9 @@ These were explicitly agreed upon. Do not change without user confirmation.
 
 6. **Anti-repeat: MD5 hash of last 500 chars stderr + last 200 chars stdout.**
    3 consecutive identical failures → STUCK termination.
-   consecutive_repeats only increments when sig == last_error_signature.
 
 7. **Model defaults:**
-   - Dev/iteration: `gemini-2.5-flash` (free, confirmed working March 2026)
+   - Dev/iteration: `gemini-2.5-flash` (free, confirmed working default)
    - Alternative: `gemini-2.0-flash` (also listed as available)
    - Configurable via `--model` flag.
 
@@ -138,7 +76,7 @@ These were explicitly agreed upon. Do not change without user confirmation.
    10 tasks × max_iters=5 × time_limit=360s per task.
    Full bench run should complete in 30–60 mins.
 
-9. **No Claude authorship in git commits.** Never add Co-Authored-By tags.
+9. **No Codex authorship in git commits.** Never add Co-Authored-By tags.
 
 ---
 
@@ -169,7 +107,7 @@ The venv is at `.venv/` and is gitignored.
 # Run a single task (best for debugging)
 patchloop run mini_003
 patchloop run mini_001 --baseline single_shot
-patchloop run mini_002 --baseline loop
+patchloop run mini_002 --baseline loop --model gemini-1.5-pro
 
 # Run full benchmark (all tasks × all baselines)
 patchloop bench
@@ -193,7 +131,7 @@ ruff check patchloop/
 ```
 patchloop/
 ├── pyproject.toml                  # build config, dependencies
-├── CLAUDE.md                       # this file
+├── AGENTS.md                       # this file
 ├── .gitignore
 ├── patchloop/                      # main Python package
 │   ├── agent/
@@ -206,10 +144,10 @@ patchloop/
 │   │   ├── task.py                 # Task, TestResult, TaskResult (Pydantic)
 │   │   ├── base.py                 # Environment ABC (10 methods)
 │   │   ├── local_env.py            # LocalEnvironment: temp dir + subprocess
-│   │   ├── git_ops.py              # GitOps: subprocess git wrapper + _apply_unified_diff
+│   │   ├── git_ops.py              # GitOps: subprocess git wrapper
 │   │   └── docker_env.py           # DockerEnvironment stub (Phase 2)
 │   ├── llm/
-│   │   └── client.py               # LLMClient: OpenAI SDK → Gemini endpoint
+│   │   └── client.py               # LLMClient: Anthropic SDK + token tracking
 │   ├── observability/
 │   │   └── logger.py               # RunLogger: JSONL event log per run
 │   ├── memory/
@@ -245,13 +183,6 @@ Does `git reset --hard <snapshot_sha>` (NOT a re-copy).
 - Fast: no filesystem copy, just git reset + clean
 - Preserves full iteration git history for replay
 
-### Patch application (_apply_unified_diff in git_ops.py)
-Pure Python unified diff applier — does NOT use `git apply`.
-- git apply was failing on macOS for unknown reasons
-- Searches for context lines via exact string match anywhere in the file
-- Robust to LLM-generated patches with wrong line numbers in @@ headers
-- Guards: resolve path + is_relative_to(workdir) before writing any file
-
 ### Diff extraction (planner.py)
 `extract_diff()` looks for a fenced ` ```diff ``` ` block first,
 then falls back to raw `--- / +++ / @@` headers.
@@ -264,14 +195,8 @@ Injects ALL reflections from the current run as bullet points under
 
 ### Anti-repeat detection (state.py)
 `LoopState.make_error_signature(stderr, stdout)` → MD5 hex[:12]
-`register_error_signature(sig)` → compares against `last_error_signature`,
-  only increments `consecutive_repeats` on exact consecutive match.
+`register_error_signature(sig)` → returns True if repeat, increments consecutive_repeats
 `is_stuck()` → True when consecutive_repeats >= max_consecutive_repeats (default 3)
-
-### loc_changed in TaskResult
-`env.git_diff()` passes `_snapshot_sha` as ref → `git diff <snapshot_sha>`.
-This compares committed patches against the clean initial state, not just
-uncommitted edits (which are always empty after git_commit()).
 
 ### Benchmark task calibration rule
 Tasks must be designed so:
@@ -320,12 +245,6 @@ All writes are flushed immediately (no buffering) to survive crashes.
 
 ## Known Issues / Gotchas
 
-- `Task.commit` field is defined but never applied. If a task YAML specifies `commit: <sha>`,
-  it's silently ignored — the repo is always copied at HEAD. Implementing it requires copying
-  the source `.git` or using `git archive` at the given SHA. Low urgency: no current tasks
-  use this field. Defer to Phase 2.
-
-
 - `pyproject.toml` build-backend must be `setuptools.build_meta` not
   `setuptools.backends.legacy:build` (already fixed, don't change it back).
 - PEP 668: never pip install without a venv on this machine.
@@ -333,11 +252,9 @@ All writes are flushed immediately (no buffering) to survive crashes.
   via subprocess in the workspace — the workspace uses whatever `pytest`
   is on PATH inside the sandbox. If setup_cmd is None, the task repo
   must not have external dependencies beyond stdlib + pytest.
-- mini_001's original retry.py had a non-bug. Fixed: now uses a single
-  `except Exception` clause that incorrectly catches PermanentError.
-- gemini-2.5-flash free tier has low RPD (requests per day). If quota
-  hits during a bench run, the run errors with 429. Wait until next day
-  or use a fresh API key from aistudio.google.com.
+- mini_001's original retry.py had a non-bug (the except PermanentError
+  clause was correct). Fixed: now uses a single `except Exception` clause
+  that incorrectly catches PermanentError.
 
 ---
 

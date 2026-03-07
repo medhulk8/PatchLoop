@@ -83,6 +83,30 @@ def _apply_unified_diff(diff: str, workdir: Path) -> list[str]:
 
             idx = file_text.find(before_text)
             if idx == -1:
+                # Fallback: match only the removed lines (ignore hallucinated context).
+                # This handles LLM-generated patches where context lines are wrong
+                # but the actual changed lines are correct.
+                removed_lines = [c for k, c in ops if k == "-"]
+                if removed_lines:
+                    removed_text = "\n".join(removed_lines)
+                    idx = file_text.find(removed_text)
+                    if idx != -1:
+                        prefix = file_text[:idx]
+                        start_line = prefix.count("\n")
+                        # Reconstruct: keep context from file, only replace removed lines
+                        new_file_lines = (
+                            file_lines[:start_line]
+                            + [c for k, c in ops if k == "+"]
+                            + file_lines[start_line + len(removed_lines):]
+                        )
+                        new_content = "\n".join(new_file_lines)
+                        if file_text.endswith("\n") or file_text == "":
+                            new_content += "\n"
+                        filepath.write_text(new_content, encoding="utf-8")
+                        if target_file not in changed_files:
+                            changed_files.append(target_file)
+                        continue
+
                 raise ValueError(
                     f"Could not find hunk context in {target_file}.\n"
                     f"Looking for:\n{before_text[:200]}"

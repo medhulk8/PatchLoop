@@ -5,7 +5,7 @@ import os
 import time
 from typing import Any, Callable
 
-from openai import OpenAI, RateLimitError
+from openai import BadRequestError, OpenAI, RateLimitError
 
 from patchloop.agent.state import IterationRecord
 
@@ -79,7 +79,7 @@ class LLMClient:
     """
     Provider-agnostic LLM client using the OpenAI-compatible API format.
 
-    Default: Google Gemini 2.0 Flash (free tier via aistudio.google.com).
+    Default: Google Gemini 2.5 Flash (free tier via aistudio.google.com).
     Can target any OpenAI-compatible provider by setting env vars:
       GEMINI_API_KEY  — for Gemini (default)
       LLM_API_KEY     — generic override
@@ -148,7 +148,7 @@ class LLMClient:
             try:
                 response = self._client.chat.completions.create(**kwargs)
                 break
-            except RateLimitError as e:
+            except RateLimitError:
                 if attempt == _retries:
                     raise
                 print(f"  [rate limit] waiting {delay:.0f}s before retry {attempt + 1}/{_retries}...")
@@ -208,11 +208,28 @@ class LLMClient:
         )
 
         for _ in range(max_tool_rounds):
-            response = self._call(
-                messages=full_messages,
-                tools=tools,
-                record=record,
-            )
+            try:
+                response = self._call(
+                    messages=full_messages,
+                    tools=tools,
+                    record=record,
+                )
+            except BadRequestError as e:
+                # Groq raises tool_use_failed when the model outputs text instead
+                # of a tool call. The actual model output is in failed_generation.
+                # Groq sets e.body to the error dict directly (no "error" wrapper).
+                if "tool_use_failed" not in str(e):
+                    raise
+                body = getattr(e, "body", None)
+                if isinstance(body, dict):
+                    # Groq: body IS the error dict
+                    if body.get("failed_generation"):
+                        return body["failed_generation"]
+                    # OpenAI-style: body wraps error under "error" key
+                    err = body.get("error", {})
+                    if isinstance(err, dict) and err.get("failed_generation"):
+                        return err["failed_generation"]
+                raise
             choice = response.choices[0]
 
             if choice.finish_reason == "stop":
