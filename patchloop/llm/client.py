@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import time
 from typing import Any, Callable
 
@@ -143,7 +144,7 @@ class LLMClient:
         if tools:
             kwargs["tools"] = tools
 
-        delay = 60.0
+        delay = 30.0
         for attempt in range(_retries + 1):
             try:
                 response = self._client.chat.completions.create(**kwargs)
@@ -151,9 +152,9 @@ class LLMClient:
             except RateLimitError:
                 if attempt == _retries:
                     raise
-                print(f"  [rate limit] waiting {delay:.0f}s before retry {attempt + 1}/{_retries}...")
+                print(f"  [rate limit] waiting {delay:.0f}s before retry {attempt + 1}/{_retries}...", flush=True, file=sys.stderr)
                 time.sleep(delay)
-                delay = min(delay * 2, 120.0)  # backoff: 60 → 120 → 120 → 120
+                delay = min(delay * 2, 60.0)  # backoff: 30 → 60 → 60 → 60
 
         if record is not None and response.usage:
             record.llm_calls += 1

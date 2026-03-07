@@ -148,10 +148,6 @@ class BenchmarkRunner:
                 result = self._run_single(task, baseline)
                 results.append(result)
 
-                # Brief pause between tasks so consecutive API calls don't
-                # immediately hit the per-minute rate limit window again.
-                time.sleep(15)
-
                 status = "[green]RESOLVED[/green]" if result.resolved else "[red]FAILED[/red]"
                 progress.update(
                     task_label,
