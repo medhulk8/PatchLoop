@@ -1,65 +1,85 @@
 # PatchLoop
 
-A benchmarkable self-improving coding agent.
+**A benchmarkable self-improving coding agent.**
 
-PatchLoop takes a buggy Python repository and an issue description, then autonomously explores the code, proposes a fix, applies it, runs the tests, and learns from failures — repeating until the bug is resolved or it runs out of attempts.
+PatchLoop gives an LLM a buggy Python repository and an issue description. The agent explores the code using tools, proposes a fix, applies it, runs the tests, and — if it fails — writes a structured lesson about what went wrong. That lesson feeds back into the next attempt.
 
-The core research question:
+The central question this project is trying to answer:
 
 > **Under what conditions does structured reflection become the load-bearing signal for an autonomous coding agent?**
 
 ---
 
-## What It Does
+## How It Works
 
-Given a buggy repo and an issue description, PatchLoop runs an agentic loop:
+```
+Issue description + buggy repo
+        │
+        ▼
+   ┌─────────┐
+   │  PLAN   │  ← Agent reads files, searches code, proposes a unified diff
+   └────┬────┘
+        │
+        ▼
+┌──────────────┐
+│ APPLY PATCH  │  ← Diff applied to files, committed to git
+└──────┬───────┘
+       │
+       ▼
+┌───────────┐
+│ RUN TESTS │  ← pytest runs; if green → RESOLVED ✓
+└─────┬─────┘
+      │ (still failing)
+      ▼
+┌──────────────────┐
+│ ANALYZE + REFLECT│  ← Agent writes a structured lesson from the failure
+└────────┬─────────┘
+         │
+         ▼
+    ┌──────────┐
+    │  REPEAT  │  ← Lesson injected into next PLAN prompt
+    └──────────┘
+```
 
-1. **Explore** — the agent reads files, lists the codebase, and searches for relevant code using LLM tool calls
-2. **Plan** — the agent proposes a fix as a unified diff
-3. **Apply** — the diff is applied to the repo and committed to git
-4. **Test** — pytest runs; if tests pass, the task is resolved
-5. **Reflect** — if tests fail, the agent writes a structured lesson about what went wrong and why
-6. **Repeat** — lessons from past failures are injected into the next attempt
-
-Every patch attempt is preserved in git history. Every run is logged in structured JSONL for analysis.
+Every patch attempt is committed to git regardless of outcome. Every run is logged in structured JSONL for analysis.
 
 ---
 
 ## The Research Design
 
-PatchLoop compares four baselines to isolate what actually helps:
+Four baselines run through the same code path. The only difference is what gets injected into each planning prompt:
 
-| Baseline | Iterations | Reflection lessons | Failing test names |
-|---|---|---|---|
-| `single_shot` | 1 | ✗ | ✗ |
-| `loop` | N | ✗ | ✗ |
-| `loop_testnames` | N | ✗ | ✓ |
-| `loop_reflect` | N | ✓ | ✓ |
+| Baseline | Loops | Structured lessons | Failing test names |
+|---|:---:|:---:|:---:|
+| `single_shot` | ✗ | ✗ | ✗ |
+| `loop` | ✓ | ✗ | ✗ |
+| `loop_testnames` | ✓ | ✗ | ✓ |
+| `loop_reflect` | ✓ | ✓ | ✓ |
 
-`loop_testnames` is an ablation baseline: it injects the names of still-failing tests into each attempt without structured lessons, isolating whether test-name grounding alone accounts for any improvement.
-
-The benchmark measures resolve rate, average iterations to success, and repeated failure rate across a suite of 15 hand-crafted tasks at varying difficulty levels.
+`loop_testnames` is an ablation baseline — it injects the names of still-failing tests but no structured lessons. This isolates whether test-name grounding alone accounts for any improvement, or whether the conceptual lesson is doing real work.
 
 ---
 
 ## Benchmark Tasks
 
-Tasks are small, self-contained Python repos with a deliberately planted bug and a pytest test suite. The tests fail on the buggy code and pass on the correct fix.
+15 hand-crafted Python mini-repos, each with a deliberately planted bug and a pytest suite that fails on the buggy code and passes on the correct fix. All stdlib-only — no pip dependencies beyond pytest.
 
-Tasks are divided into two slices:
+**Standard slice (mini_001–010)** — informative test names, single and multi-file bugs
 
-**Standard slice (mini_001–010)** — informative test names, single or multi-file bugs
-**Reflection-critical slice (mini_011–015)** — generic test names (`test_regression_N`), cascade bugs across multiple files, vague issue descriptions, and wrong-file traps
+**Reflection-critical slice (mini_011–015)** — generic test names (`test_regression_N`), cascade bugs across multiple files, vague issue descriptions, wrong-file traps
 
-The reflection-critical slice is designed so that test-name grounding alone is insufficient — the agent needs to encode and apply a conceptual lesson to make progress.
+The reflection-critical slice is designed so that test-name grounding alone is insufficient. The agent must encode and apply a conceptual lesson to make progress — it cannot just grep for the failing test name and open the obvious file.
 
-All task repos are stdlib-only (no pip dependencies beyond pytest).
+Example cascade bug (mini_015):
+- **Bug A** (`enricher.py`): `e.priority = e.priority or default` — replaces `0` with a default value because `0` is falsy
+- **Bug B** (`reducer.py`): `if e.priority:` — silently skips all zero-priority events
+- Fixing Bug A makes some tests pass, but Bug B still silently drops data. The agent must iterate to find and fix both.
 
 ---
 
 ## Setup
 
-Requires Python 3.11+. Tested on Python 3.13.
+Requires Python 3.11+.
 
 ```bash
 git clone https://github.com/medhulk8/PatchLoop.git
@@ -73,17 +93,22 @@ pip install -e ".[dev]"
 
 ### API Key
 
-PatchLoop uses an OpenAI-compatible API format and works with any provider that supports it. The default is Google Gemini (free tier).
+PatchLoop uses the OpenAI-compatible API format. **Cerebras is the recommended provider** — it has a generous free tier (14,400 requests/day) and runs fast.
 
 ```bash
-# Option 1: Google Gemini (free — https://aistudio.google.com)
-export GEMINI_API_KEY=your_key_here
-
-# Option 2: Cerebras (free, higher quota — https://cloud.cerebras.ai)
+# Recommended: Cerebras (free — https://cloud.cerebras.ai)
 export CEREBRAS_API_KEY=your_key_here
-# base URL auto-configured; use --model gpt-oss-120b
+# base URL is auto-configured; use --model gpt-oss-120b
+```
 
-# Option 3: Groq or any OpenAI-compatible provider
+Other supported providers:
+
+```bash
+# Google Gemini (free — https://aistudio.google.com)
+export GEMINI_API_KEY=your_key_here
+# default model: gemini-2.5-flash
+
+# Groq or any OpenAI-compatible endpoint
 export LLM_API_KEY=your_key_here
 export LLM_BASE_URL=https://api.groq.com/openai/v1
 ```
@@ -95,24 +120,27 @@ export LLM_BASE_URL=https://api.groq.com/openai/v1
 ### Run a single task
 
 ```bash
-# Default: loop_reflect baseline, gemini-2.5-flash
-patchloop run mini_001
+# Run one task with one baseline
+patchloop run mini_001 --model gpt-oss-120b
 
-# Specify baseline and model
+# Specify baseline
 patchloop run mini_004 --baseline loop --model gpt-oss-120b
 
-# Constrain the search budget (tool rounds per planning step)
-patchloop run mini_006 --baseline loop_reflect --tool-rounds 8
+# Constrain the search budget (tool calls per planning step)
+patchloop run mini_006 --baseline loop_reflect --model gpt-oss-120b --tool-rounds 8
 ```
 
-### Run the benchmark
+### Run the full benchmark
 
 ```bash
 # All tasks × all baselines
 patchloop bench --model gpt-oss-120b
 
 # Specific tasks and baselines
-patchloop bench -t mini_004 -t mini_005 -t mini_006 -b loop -b loop_reflect
+patchloop bench \
+  -t mini_004 -t mini_005 -t mini_006 \
+  -b loop -b loop_reflect \
+  --model gpt-oss-120b
 
 # Averaged over multiple repetitions (recommended for credible results)
 patchloop bench \
@@ -125,15 +153,15 @@ patchloop bench \
   --call-delay 7
 ```
 
-### Key flags
+### Flags
 
 | Flag | Default | Description |
 |---|---|---|
-| `--model` | `gemini-2.5-flash` | LLM model to use |
-| `--tool-rounds` | `15` | Max tool calls per planning step (search budget) |
-| `--num-runs` | `1` | Repetitions per task/baseline pair (for averaging) |
-| `--run-delay` | `30` | Seconds between repetitions (avoids quota bursts) |
-| `--call-delay` | `0` | Seconds to sleep before each API call (rate pacing) |
+| `--model` | `gemini-2.5-flash` | LLM model |
+| `--tool-rounds` | `15` | Max tool calls per planning step |
+| `--num-runs` | `1` | Repetitions per task/baseline (for averaging) |
+| `--run-delay` | `30` | Seconds between repetitions |
+| `--call-delay` | `0` | Seconds between individual API calls (rate pacing) |
 
 ---
 
@@ -143,57 +171,51 @@ patchloop bench \
 patchloop/
 ├── patchloop/
 │   ├── agent/
-│   │   ├── loop.py          # State machine: PLAN → APPLY → TEST → REFLECT → repeat
-│   │   ├── planner.py       # PLAN phase: tool-use loop + diff extraction + prompt assembly
-│   │   ├── patcher.py       # APPLY phase: diff validation + application + git commit
-│   │   ├── reflector.py     # REFLECT phase: structured JSON lesson from test failure
-│   │   └── state.py         # LoopState, IterationRecord, Reflection, anti-repeat detection
+│   │   ├── loop.py          # State machine orchestrating all phases
+│   │   ├── planner.py       # PLAN: tool-use loop, prompt assembly, diff extraction
+│   │   ├── patcher.py       # APPLY: diff validation, application, git commit
+│   │   ├── reflector.py     # REFLECT: structured JSON lesson from test failure
+│   │   └── state.py         # LoopState, IterationRecord, Reflection, anti-repeat logic
 │   ├── environment/
 │   │   ├── local_env.py     # Sandboxed temp dir + subprocess test runner
-│   │   ├── git_ops.py       # Pure Python unified diff applier + git subprocess wrapper
-│   │   └── task.py          # Task and TaskResult data models (loaded from YAML)
+│   │   ├── git_ops.py       # Pure Python unified diff applier + git wrapper
+│   │   └── task.py          # Task and TaskResult models (loaded from YAML)
 │   ├── llm/
-│   │   └── client.py        # Provider-agnostic LLM client (Gemini / Cerebras / Groq)
+│   │   └── client.py        # Provider-agnostic client (Cerebras / Gemini / Groq)
 │   ├── eval/
 │   │   ├── bench_runner.py  # Benchmark orchestration: tasks × baselines × repetitions
-│   │   ├── baselines.py     # build_agent() factory wiring all components together
+│   │   ├── baselines.py     # build_agent() factory
 │   │   └── metrics.py       # Resolve rate, repeat failure rate, iteration stats
-│   └── cli.py               # patchloop run / patchloop bench CLI
+│   └── cli.py               # patchloop run / patchloop bench
 └── eval/
     └── tasks/
-        ├── mini_001.yaml    # Task definition: issue, repo path, test command, limits
-        ├── ...
+        ├── mini_001.yaml    # Task: issue text, repo path, test command, limits
         └── repos/
-            ├── mini_001/    # Buggy repo + pytest suite
-            └── ...
+            └── mini_001/    # Buggy Python repo + pytest suite
 ```
 
 ---
 
-## How the Patch Application Works
+## Key Design Details
 
-PatchLoop uses a pure Python unified diff applier instead of `git apply`. This makes it robust to LLM-generated patches that have slightly wrong line numbers — the applier searches for the context block anywhere in the file using exact line-by-line comparison, rather than trusting the `@@` header line numbers. Every applied patch is committed to git regardless of whether tests pass, so the full iteration history is preserved for analysis.
+**Pure Python diff application** — PatchLoop does not use `git apply`. It implements its own unified diff applier that searches for context blocks line-by-line rather than trusting the `@@` line numbers in the patch. This makes it robust to LLM-generated patches with slightly wrong offsets.
 
----
+**Anti-repeat detection** — If the agent produces the same failure three times in a row (detected by MD5 hash of test output), the run terminates with `STUCK` instead of looping indefinitely.
 
-## Observability
+**Full git history** — Every patch attempt is committed to git regardless of outcome. The entire iteration history is preserved for replay and analysis.
 
-Every run produces a structured JSONL log at `runs/{run_id}/{task_id}.jsonl`. Each line is one event: phase transition, plan text, proposed diff, patch outcome, test result, reflection, or run summary. All writes are flushed immediately so logs survive crashes.
-
-Benchmark reports are written to `runs/report_{timestamp}.json` with full per-task, per-baseline breakdowns.
+**Structured reflection** — Reflections are JSON objects with fields: `what_failed`, `root_cause_hypothesis`, `patch_summary`, `lesson`. Only the `lesson` field is injected into subsequent prompts, keeping the signal tight.
 
 ---
 
-## Hypothesis
+## The Hypothesis
 
-The working hypothesis being tested:
+> Reflection becomes load-bearing when search is scarce and the next action is ambiguous.
 
-> Reflection becomes load-bearing when search is scarce and the next action is ambiguous — not universally, and not simply because a repo is large.
-
-The key design constraint for reflection-critical tasks: **selective search pressure without leaking the invariant**. The issue description, test names, and code comments must not point too directly at the bug location. The agent must choose which files to explore, and when it chooses wrong, it needs the structured lesson from the failure to course-correct — not just the failing test name.
+Not universally. Not just because a repo is large. The key design constraint for reflection-critical tasks is **selective search pressure without leaking the invariant** — the issue description, test names, and code must not point too directly at the bug. The agent must choose which files to explore, and when it chooses wrong, the structured lesson needs to encode something the test name alone does not.
 
 ---
 
 ## Status
 
-Active research project. Benchmark suite and infrastructure are complete. Averaged multi-run results across the reflection-critical task slice are in progress.
+Active research project. Infrastructure and benchmark suite are complete. Averaged multi-run results across the reflection-critical task slice are in progress.
