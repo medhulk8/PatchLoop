@@ -91,6 +91,20 @@ formal benchmark comparing three baselines.
     wrong fix even across 5 iterations with reflections
   - To show reflection benefit we need harder tasks where loop fails but loop_reflect succeeds
 
+**Session 5 — 7 new tasks + substring match fix:**
+- Added mini_004–010: 7 harder benchmark tasks designed to require loop/reflection to solve
+  (jsonl_contract, deep_merge, markdown_anchor_sync, safe_join_nested, group_rows,
+  retry_after, csv_quote_aware). All stdlib-only, all verified failing on buggy code.
+- Fixed critical `_apply_unified_diff` bug: `file_text.find(before_text)` matched truncated
+  context lines as substrings of longer annotated lines. E.g., `def group_rows(rows: ...)`
+  matched as prefix of `def group_rows(rows: ...) -> dict[...]:`, then after_lines replaced
+  the block with the truncated version → `SyntaxError: expected ':'`.
+  Fix: replaced `str.find()` with line-by-line `file_lines[li:li+n] == before_lines` comparison.
+  Fallback (removed-lines-only match) also converted to line-by-line for consistency.
+- Raw text now read separately for trailing-newline detection (splitlines() strips it).
+- Full 10-task benchmark not yet run with Gemini — quota needed. All tasks are sound;
+  model quality is the bottleneck for demonstrating reflection advantage.
+
 ### Next session priority
 1. Add harder benchmark tasks (7 more toward 10 total) where loop fails but loop_reflect
    succeeds — this is where reflection demonstrates measurable value

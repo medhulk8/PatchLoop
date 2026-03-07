@@ -76,45 +76,53 @@ def _apply_unified_diff(diff: str, workdir: Path) -> list[str]:
             if not before_lines:
                 continue  # empty hunk, skip
 
-            # Find the before block in the file using exact string search
-            file_lines = filepath.read_text(encoding="utf-8", errors="replace").splitlines()
-            before_text = "\n".join(before_lines)
-            file_text = "\n".join(file_lines)
+            # Find the before block in the file using line-by-line exact comparison.
+            # We do NOT use file_text.find(before_text) because that matches
+            # before_text as a substring of the joined string — a truncated context
+            # line like "def foo(x)" will spuriously match inside "def foo(x) -> int:"
+            # causing the patched file to lose the return annotation and colon.
+            raw_text = filepath.read_text(encoding="utf-8", errors="replace")
+            file_lines = raw_text.splitlines()
+            file_text = raw_text  # kept for trailing-newline detection only
 
-            idx = file_text.find(before_text)
-            if idx == -1:
+            start_line: int | None = None
+            for li in range(len(file_lines) - len(before_lines) + 1):
+                if file_lines[li : li + len(before_lines)] == before_lines:
+                    start_line = li
+                    break
+
+            if start_line is None:
                 # Fallback: match only the removed lines (ignore hallucinated context).
                 # This handles LLM-generated patches where context lines are wrong
                 # but the actual changed lines are correct.
                 removed_lines = [c for k, c in ops if k == "-"]
                 if removed_lines:
-                    removed_text = "\n".join(removed_lines)
-                    idx = file_text.find(removed_text)
-                    if idx != -1:
-                        prefix = file_text[:idx]
-                        start_line = prefix.count("\n")
-                        # Reconstruct: keep context from file, only replace removed lines
-                        new_file_lines = (
-                            file_lines[:start_line]
-                            + [c for k, c in ops if k == "+"]
-                            + file_lines[start_line + len(removed_lines):]
+                    for li in range(len(file_lines) - len(removed_lines) + 1):
+                        if file_lines[li : li + len(removed_lines)] == removed_lines:
+                            # Reconstruct: keep context from file, only replace removed lines
+                            new_file_lines = (
+                                file_lines[:li]
+                                + [c for k, c in ops if k == "+"]
+                                + file_lines[li + len(removed_lines):]
+                            )
+                            new_content = "\n".join(new_file_lines)
+                            if file_text.endswith("\n") or file_text == "":
+                                new_content += "\n"
+                            filepath.write_text(new_content, encoding="utf-8")
+                            if target_file not in changed_files:
+                                changed_files.append(target_file)
+                            break
+                    else:
+                        raise ValueError(
+                            f"Could not find hunk context in {target_file}.\n"
+                            f"Looking for:\n{chr(10).join(before_lines[:10])}"
                         )
-                        new_content = "\n".join(new_file_lines)
-                        if file_text.endswith("\n") or file_text == "":
-                            new_content += "\n"
-                        filepath.write_text(new_content, encoding="utf-8")
-                        if target_file not in changed_files:
-                            changed_files.append(target_file)
-                        continue
+                    continue
 
                 raise ValueError(
                     f"Could not find hunk context in {target_file}.\n"
-                    f"Looking for:\n{before_text[:200]}"
+                    f"Looking for:\n{chr(10).join(before_lines[:10])}"
                 )
-
-            # Count how many lines precede the match
-            prefix = file_text[:idx]
-            start_line = prefix.count("\n")
 
             # Replace before_lines with after_lines
             new_file_lines = (
