@@ -8,8 +8,8 @@ def summarize_bucket(records: list[Record]) -> dict:
     The representative value is a weighted average of amounts, where each
     record's weight reflects its relative importance in the dataset.
 
-    Returns raw floats — string formatting for display is the responsibility
-    of value_formatter.py, not this module.
+    Returns raw floats — string formatting for display is handled at a
+    later stage in the pipeline and is not this module's concern.
     """
     total_amount = sum(r.amount for r in records)
     total_weight = sum(r.weight for r in records)
