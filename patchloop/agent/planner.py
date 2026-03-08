@@ -38,8 +38,9 @@ def _extract_failed_tests(state: LoopState) -> str:
     last_result = state.iterations[-1].test_result
     if not last_result or last_result.passed:
         return ""
+    combined = (last_result.stdout or "") + "\n" + (last_result.stderr or "")
     failed_lines = [
-        line for line in (last_result.stdout or "").splitlines()
+        line for line in combined.splitlines()
         if line.startswith("FAILED")
     ][:10]
     if not failed_lines:

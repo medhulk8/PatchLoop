@@ -86,6 +86,11 @@ def bench(
         patchloop bench --num-runs 3 --run-delay 60  # 3x averaged, 60s between seeds
         patchloop bench --call-delay 7             # pace calls for Cerebras 10 RPM limit
     """
+    if num_runs < 1:
+        raise typer.BadParameter("--num-runs must be >= 1", param_hint="'--num-runs'")
+    if tool_rounds < 1:
+        raise typer.BadParameter("--tool-rounds must be >= 1", param_hint="'--tool-rounds'")
+
     runner = BenchmarkRunner(
         tasks_dir=tasks_dir,
         runs_dir=runs_dir,
