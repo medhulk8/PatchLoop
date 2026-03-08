@@ -40,14 +40,15 @@ When test names are generic (`test_regression_01`…`test_regression_05`), the s
 | `loop_testnames` | 33.3% | 1.00 | 22.2% |
 | `loop_reflect` | **66.7%** | **2.50** | **0.0%** |
 
-**mini_017** (log_aggregator, 11 files) — single validation run, tool_rounds=6:
+**mini_017** (log_aggregator, 11 files) — 3× replication, tool_rounds=6 (reps 1+2 clean; rep 3 throttled by daily token quota):
 
-| Baseline | Result | Iters | Repeat failures |
-|---|---|---|---|
-| `loop` | FAILED | 5 | 20.0% |
-| `loop_reflect` | **RESOLVED** | **3** | **0.0%** |
+| Baseline | Resolve rate | Repeat failure rate |
+|---|---|---|
+| `loop` | 0.0% (0/3) | 33.3% |
+| `loop_testnames` | 0.0% (0/3) | 25.0% |
+| `loop_reflect` | **33.3% (1/3)** | **22.2%** |
 
-*(3× replication in progress.)*
+Clean data (reps 1+2 only): loop=0%, loop_testnames=0%, loop_reflect=50% (1/2). Rep 3 quota-throttled — loop_testnames and loop_reflect terminated in 1 iter each (invalid). Loop rep 3 clean: FAILED in 5 iters. Pattern matches mini_016: loop_reflect is the only baseline that resolves the cascade.
 
 ### Why reflection matters in this regime
 

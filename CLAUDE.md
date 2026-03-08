@@ -24,7 +24,7 @@ formal benchmark comparing four baselines.
 
 ## Current Status
 
-**17 tasks built. mini_016 validated (3× replication). mini_017 validated (single run) — corroborates mini_016 with clean baseline separation.**
+**17 tasks built. mini_016 (3× replicated). mini_017 (3× attempted, rep 3 throttled). Both corroborate: loop_reflect is the only baseline that can escape the cascade on reflection-critical tasks.**
 
 ### Completed this project so far
 
@@ -326,12 +326,11 @@ formal benchmark comparing four baselines.
 - CEREBRAS_API_KEY is in ~/.zshenv — no manual setup needed
 
 **What's left:**
-1. **Run mini_017 3× replication** to corroborate the single-run result (same command as mini_016):
+1. **Re-run mini_017 rep 3** (loop_testnames + loop_reflect only, rep 3 was throttled):
    ```bash
-   patchloop bench -t mini_017 -b loop -b loop_testnames -b loop_reflect --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 30 --call-delay 7
+   patchloop bench -t mini_017 -b loop_testnames -b loop_reflect --model gpt-oss-120b --tool-rounds 6 --num-runs 1 --call-delay 7
    ```
-2. **Write up the research story** — the README is still the default skeleton. A clear summary of
-   what was built, what was measured, and what was found belongs in README.md.
+2. **README is written** — research story, findings, task table, and hypothesis are all documented.
 3. **Optionally run single_shot baseline on mini_016/017** to complete the 4-baseline picture.
 
 **The research story in one paragraph:**
@@ -344,7 +343,7 @@ loop_reflect doubles the resolve rate vs loop and loop_testnames.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
 
-**Session 16 — mini_017 built and validated:**
+**Session 16 — mini_017 built, validated, and 3× replicated (partial):**
 - Built mini_017 (log_aggregator): 11-file pipeline, second reflection-critical cascade task.
   - Bug A (aggregator.py): `error_rate = total_errors / len(entries)` — divides by entry count, not total_requests.
     Tests 02,03,04,05 fail; test_01 passes (single entry, same result both ways).
@@ -352,13 +351,14 @@ CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
     Only manifests after fixing Bug A. test_04 uses error_count=14.25 → truncated to 14.
   - Generic file name: `entry_log.py` sounds like an audit log, not a numeric conversion module.
   - Issue description points to "aggregation or statistics persistence" without naming files.
-- **Validation results** (tool_rounds=6, gpt-oss-120b, single run):
-  - loop: **FAILED** (5 iters, 20% repeat failures) — stuck on aggregator.py, never reaches entry_log.py
-  - loop_reflect: **RESOLVED** (3 iters, 0 repeat failures, 9 LOC changed)
-  - Clean baseline separation on first run, mirrors mini_016 pattern.
+- **3× replication results** (tool_rounds=6, gpt-oss-120b):
+  - Clean reps 1 and 2: loop=0% (0/2), loop_testnames=0% (0/2), loop_reflect=50% (1/2)
+  - Rep 3 throttled: Cerebras daily token quota exhausted — loop_testnames and loop_reflect
+    terminated in 1 iter each (invalid). Only loop rep 3 is clean (FAILED in 5 iters as expected).
+  - Pattern matches mini_016: loop_reflect is the only baseline that resolves the cascade.
 - **Design rule confirmed**: generic file name + tight tool budget + clean cascade = reflection-critical task.
-  Two independent tasks now show the same pattern.
-- Report: runs/report_1772980823.json
+- **README rewritten** with actual research findings, benchmark results, and the core hypothesis.
+- Reports: runs/report_1772980823.json (validation), runs/report_1772983409.json (3× run)
 
 **Session 15 — mini_016 redesign + 3× confirmed replication:**
 - **Docstring breadcrumb removed**: summarizer.py previously named `value_formatter.py` directly.
@@ -645,17 +645,23 @@ but 3× average confirms loop_reflect consistently ahead.
 
 Report: runs/report_1772977530.json
 
-### mini_017 (reflection-critical — single validation run)
+### mini_017 (reflection-critical — 3× attempted, rep 3 throttled)
 | ID       | Bug                                    | Difficulty | Design intent |
 |----------|----------------------------------------|------------|---------------|
 | mini_017 | aggregator.py wrong denominator + entry_log.py int() truncation | hard | 11-file log pipeline; fix aggregator (4/5 pass) then entry_log; loop gets stuck, loop_reflect escapes via reflection lesson |
 
-**Single-run validation results** (tool_rounds=6, gpt-oss-120b):
+**3× replication results** (tool_rounds=6, gpt-oss-120b):
 
-| Baseline | Result | Iters | Runtime | Repeat failures |
-|---|---|---|---|---|
-| loop | FAILED | 5 | 256s | 20.0% |
-| loop_reflect | **RESOLVED** | **3** | 155s | **0.0%** |
+| Baseline | Resolve rate | Avg iters (failure) | Repeat failure rate |
+|---|---|---|---|
+| loop | 0.0% (0/3) | 5.00 | 33.3% |
+| loop_testnames | 0.0% (0/3) | 2.67 | 25.0% |
+| loop_reflect | **33.3% (1/3)** | 3.00 | 22.2% |
+
+**NOTE on rep 3**: Daily Cerebras token quota exhausted during rep 3. loop_testnames and loop_reflect
+both hit 4/4 retries and terminated in 1 iter each (invalid results). Only loop rep 3 is clean.
+Clean data from reps 1 and 2: loop=0% (0/2), loop_testnames=0% (0/2), loop_reflect=50% (1/2).
+Pattern matches mini_016: loop_reflect is the only baseline that escapes the cascade.
 
 **Key design decisions:**
 - Bug B file named `entry_log.py` — sounds like an audit trail, not a float-to-int conversion module
@@ -664,7 +670,7 @@ Report: runs/report_1772977530.json
 - tool_rounds=6: same pressure as mini_016
 - Cascade verified: fix aggregator.py → 4/5 pass; test_04 still fails (error_count=14 instead of 14.25)
 
-Report: runs/report_1772980823.json
+Reports: runs/report_1772980823.json (validation), runs/report_1772983409.json (3× run)
 
 ---
 
