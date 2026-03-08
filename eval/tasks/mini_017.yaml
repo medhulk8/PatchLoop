@@ -1,5 +1,5 @@
-id: mini_017
-repo: eval/tasks/repos/mini_017
+task_id: mini_017
+repo: repos/mini_017
 test_cmd: pytest test_regression.py -v
 issue: |
   The log aggregation pipeline is producing incorrect results for services
