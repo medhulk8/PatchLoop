@@ -321,17 +321,25 @@ formal benchmark comparing four baselines.
 
 **Current standing:**
 - mini_016: 3× replicated — loop_reflect=66.7%, loop=loop_testnames=33.3%
-- mini_017: single validation run — loop_reflect=100% (RESOLVED 3 iters), loop=0% (FAILED 5 iters)
+- mini_017: 3× attempted; reps 1+2 clean (loop=0%, loop_testnames=0%, loop_reflect=50%); rep 3 throttled repeatedly (daily token quota exhausted mid-run)
 - Two independent reflection-critical tasks with consistent baseline separation
 - CEREBRAS_API_KEY is in ~/.zshenv — no manual setup needed
 
-**What's left:**
-1. **Re-run mini_017 rep 3** (loop_testnames + loop_reflect only, rep 3 was throttled):
+**IMPORTANT — mini_017 rep 3 note:**
+Two separate rerun attempts (Session 16 and 17) both hit Cerebras daily token quota mid-run.
+Rep 3 always runs on a day where earlier benchmarks already spent the daily budget.
+The fix: **run mini_017 rep 3 FIRST on a fresh day, before any other API calls.**
+Command:
+```bash
+patchloop bench -t mini_017 -b loop_testnames -b loop_reflect --model gpt-oss-120b --tool-rounds 6 --num-runs 1 --call-delay 7
+```
+(loop rep 3 is clean at 0/1 FAILED; only loop_testnames and loop_reflect need re-running)
+
+**After mini_017 rep 3 (still on fresh day, same session):**
+2. **Run single_shot baseline on mini_016/017** to complete the 4-baseline picture:
    ```bash
-   patchloop bench -t mini_017 -b loop_testnames -b loop_reflect --model gpt-oss-120b --tool-rounds 6 --num-runs 1 --call-delay 7
+   patchloop bench -t mini_016 -t mini_017 -b single_shot --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 30 --call-delay 7
    ```
-2. **README is written** — research story, findings, task table, and hypothesis are all documented.
-3. **Optionally run single_shot baseline on mini_016/017** to complete the 4-baseline picture.
 
 **The research story in one paragraph:**
 Reflection produces measurably better outcomes specifically when (a) test names are generic and
@@ -342,6 +350,16 @@ reflection adds nothing. On reflection-critical tasks (generic names + tight bud
 loop_reflect doubles the resolve rate vs loop and loop_testnames.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
+
+**Session 17 — mini_017 rep 3 rerun blocked by token quota:**
+- Attempted clean rerun of mini_017 rep 3 (loop_testnames + loop_reflect only).
+- Result: Cerebras daily token quota exhausted again. Both baselines hit 4/4 retries and terminated
+  in 1 iter each (invalid). Same failure mode as Session 16 rep 3.
+- Root cause confirmed: the daily token budget is consistently spent by the time rep 3 runs.
+  The only solution is to run rep 3 FIRST on a fresh day, before any other API calls.
+- loop_testnames ran 5 iters but LOC changed = 0 (all patches empty due to quota failures).
+  Result is invalid — not usable as clean data.
+- No code changes this session. Report: runs/report_1772990134.json
 
 **Session 16 — mini_017 built, validated, and 3× replicated (partial):**
 - Built mini_017 (log_aggregator): 11-file pipeline, second reflection-critical cascade task.
