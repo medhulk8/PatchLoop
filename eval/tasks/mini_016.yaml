@@ -1,0 +1,21 @@
+task_id: mini_016
+repo: repos/mini_016
+issue: |
+  The monthly summary report is producing representative values that do not
+  match our expected outputs for most categories. We have manually verified
+  the input data is correct. The report structure, field names, and category
+  labels are all fine — but the numeric representative value per category is
+  consistently wrong.
+
+  Records are loaded and validated without errors. The discrepancy is
+  reproducible across multiple report runs.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - wrong-file-trap
+  - reflection-critical
+  - generic-test-names
+  - weighted-average

@@ -280,5 +280,8 @@ class LLMClient:
             # Any other finish reason — return whatever content we have
             return choice.message.content or ""
 
-        # Exhausted rounds without reaching "stop"
+        # Exhausted tool rounds — the last response was a tool_calls message
+        # (content is empty). Force one final text-only call so the model can
+        # commit to a diff based on everything it has read so far.
+        response = self._call(messages=full_messages, tools=None, record=record)
         return response.choices[0].message.content or ""

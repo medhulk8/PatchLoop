@@ -351,6 +351,29 @@ formal benchmark comparing four baselines.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
 
+**Session 14 — mini_016 + planner bug fix:**
+- **Critical client.py bug fixed**: when `max_tool_rounds` is exhausted and the last response
+  has `finish_reason == "tool_calls"` (not "stop"), `choice.message.content` is None/empty.
+  The fix: after exhausting rounds, make one final text-only call (no tools) to force the
+  model to commit to a diff based on everything it has read. This was silently causing many
+  NO_DIFF failures across all tasks when the model was thorough in exploration.
+- **mini_016 built** (weighted_bucket_report, 10 files): cascade bug across 2 files.
+  - BUG A (summarizer.py): plain average instead of weighted average
+  - BUG B (value_formatter.py): `:.2f` truncates precision, causing test_04 to expect "9.0909" but get "9.09"
+  - Cascade: fixing summarizer.py makes 4/5 tests pass; test_04 still fails for formatting precision
+  - Reflection lesson: "format to 4 decimal places" → points model to value_formatter.py
+  - Docstring in summarizer.py explicitly says: "string formatting is done by value_formatter.py"
+  - 10 files + tool_rounds=6 ensures model can't read everything in one pass
+  - Generic test names: test_regression_N (can't grep for file location)
+- **Validation results** (tool_rounds=6, Cerebras gpt-oss-120b, single run each):
+  - loop: **STUCK** (3 iters — keeps re-fixing summarizer.py, never reaches value_formatter.py)
+  - loop_reflect: **RESOLVED** (3 iters — lesson correctly identifies formatter, model fixes :.2f → :.4f)
+  - loop_testnames: ERROR (token quota exhausted mid-run; likely similar to loop)
+  - single_shot: FAILED — finds summarizer.py, fixes it, but misses value_formatter.py (4/5 pass)
+  - This is the **first confirmed reflection-critical task** with baseline separation!
+- **Next**: replicate mini_016 result (3× runs per baseline) tomorrow when quota resets.
+  Command: `patchloop bench -t mini_016 -b loop -b loop_testnames -b loop_reflect --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 30 --call-delay 7`
+
 ---
 
 ## Locked Architecture Decisions (Do Not Re-Litigate)
@@ -565,6 +588,14 @@ Designed so loop_testnames cannot win just from the test name — the conceptual
 
 All 15 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
 mini_014 NOTE: too easy — model patched it without using any tools. Keep as calibration task only.
+
+### mini_016 (reflection-critical — CONFIRMED baseline separation)
+| ID       | Bug                                    | Difficulty | Design intent |
+|----------|----------------------------------------|------------|---------------|
+| mini_016 | summarizer.py plain avg + value_formatter.py :.2f precision | hard | 10-file pipeline; fix summarizer (4/5 pass) then formatter; loop gets STUCK, loop_reflect escapes via lesson |
+
+Verified single-run: loop=STUCK, loop_reflect=RESOLVED, single_shot=FAILED (4/5 pass).
+Run with tool_rounds=6. Needs 3× replication to confirm.
 
 ---
 
