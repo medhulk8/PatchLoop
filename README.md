@@ -2,11 +2,62 @@
 
 **A benchmarkable self-improving coding agent.**
 
-PatchLoop gives an LLM a buggy Python repository and an issue description. The agent explores the code using tools, proposes a fix, applies it, runs the tests, and — if it fails — writes a structured lesson about what went wrong. That lesson feeds back into the next attempt.
+PatchLoop gives an LLM a buggy Python repository and an issue description. The agent explores the code using tools, proposes a unified diff fix, applies it, runs the tests, and — if it still fails — writes a structured lesson about what went wrong. That lesson feeds into the next attempt.
 
-The central question this project is trying to answer:
+The central question:
 
 > **Under what conditions does structured reflection become the load-bearing signal for an autonomous coding agent?**
+
+---
+
+## What Was Found
+
+Reflection does not universally improve autonomous coding agents. Whether it helps depends on the *task regime*:
+
+### Standard tasks (informative test names)
+
+On tasks where failing test names point toward the broken file, **test-name grounding alone accounts for most of the improvement**. Structured lessons add little.
+
+3× averaged benchmark on mini_004/005/006 (tool_rounds=8, gpt-oss-120b):
+
+| Baseline | Resolve rate | Repeat failure rate |
+|---|---|---|
+| `loop` | 55.6% | 23.1% |
+| `loop_testnames` | **66.7%** | **7.7%** |
+| `loop_reflect` | 55.6% | 20.0% |
+
+`loop_testnames` wins. Injecting the names of still-failing tests (e.g., `test_writer_terminates_each_record_with_newline`) is more actionable than an abstract conceptual lesson. The model can open the right file directly.
+
+### Reflection-critical tasks (generic test names + tight budget + cascade bugs)
+
+When test names are generic (`test_regression_01`…`test_regression_05`), the second bug is in a file with a non-revealing name, and the tool budget prevents reading everything in one pass — **structured reflection becomes the load-bearing signal**.
+
+**mini_016** (weighted_bucket_report, 11 files) — 3× replication, tool_rounds=6:
+
+| Baseline | Resolve rate | Avg iters (success) | Repeat failure rate |
+|---|---|---|---|
+| `loop` | 33.3% | 5.00 | 33.3% |
+| `loop_testnames` | 33.3% | 1.00 | 22.2% |
+| `loop_reflect` | **66.7%** | **2.50** | **0.0%** |
+
+**mini_017** (log_aggregator, 11 files) — single validation run, tool_rounds=6:
+
+| Baseline | Result | Iters | Repeat failures |
+|---|---|---|---|
+| `loop` | FAILED | 5 | 20.0% |
+| `loop_reflect` | **RESOLVED** | **3** | **0.0%** |
+
+*(3× replication in progress.)*
+
+### Why reflection matters in this regime
+
+Both tasks follow the same cascade structure:
+- **Bug A** is findable from the issue description. Fixing it makes 4/5 tests pass.
+- **Bug B** is in a generically-named file (`record_ops.py`, `entry_log.py`) that doesn't reveal its role. With only 6 tool rounds, the model cannot read every file — it must choose.
+- After fixing Bug A, `loop` and `loop_testnames` have no signal about where to look next. They cycle back to the file they already fixed.
+- `loop_reflect` encodes a lesson like *"the output value is being truncated — look at where the statistics are persisted"* and uses it to redirect exploration to the right file.
+
+The structured lesson carries information that neither the test name nor the issue description contains.
 
 ---
 
@@ -19,7 +70,7 @@ Issue description + buggy repo
    ┌─────────┐
    │  PLAN   │  ← Agent reads files, searches code, proposes a unified diff
    └────┬────┘
-        │
+        │ (diff found)
         ▼
 ┌──────────────┐
 │ APPLY PATCH  │  ← Diff applied to files, committed to git
@@ -32,7 +83,7 @@ Issue description + buggy repo
       │ (still failing)
       ▼
 ┌──────────────────┐
-│ ANALYZE + REFLECT│  ← Agent writes a structured lesson from the failure
+│ ANALYZE + REFLECT│  ← Structured JSON lesson written from the failure
 └────────┬─────────┘
          │
          ▼
@@ -45,9 +96,9 @@ Every patch attempt is committed to git regardless of outcome. Every run is logg
 
 ---
 
-## The Research Design
+## The Four Baselines
 
-Four baselines run through the same code path. The only difference is what gets injected into each planning prompt:
+All four run through the same code path. The only difference is what gets injected into the planning prompt:
 
 | Baseline | Loops | Structured lessons | Failing test names |
 |---|:---:|:---:|:---:|
@@ -56,24 +107,50 @@ Four baselines run through the same code path. The only difference is what gets 
 | `loop_testnames` | ✓ | ✗ | ✓ |
 | `loop_reflect` | ✓ | ✓ | ✓ |
 
-`loop_testnames` is an ablation baseline — it injects the names of still-failing tests but no structured lessons. This isolates whether test-name grounding alone accounts for any improvement, or whether the conceptual lesson is doing real work.
+`loop_testnames` is an ablation baseline that isolates whether test-name grounding alone accounts for improvement over bare looping, or whether the conceptual lesson is doing real work.
+
+---
+
+## The Task Design Constraint
+
+The critical insight from building these tasks: **file naming is a confound**.
+
+A first version of mini_016 used a file named `value_formatter.py`. The model would list the repo files, see the name, immediately open it, and fix both bugs in a single pass — bypassing the cascade entirely and making all baselines equivalent. Renaming it to `record_ops.py` (with generic functions and a docstring framed as "data normalisation") restored the intended search pressure.
+
+This generalizes: for a task to be reflection-critical, the second bug file must not semantically reveal the bug type from its name alone. The model's file selection must be genuinely ambiguous after the first fix, so the structured lesson can redirect it.
 
 ---
 
 ## Benchmark Tasks
 
-15 hand-crafted Python mini-repos, each with a deliberately planted bug and a pytest suite that fails on the buggy code and passes on the correct fix. All stdlib-only — no pip dependencies beyond pytest.
+17 hand-crafted Python mini-repos, all stdlib-only (no pip deps beyond pytest).
 
-**Standard slice (mini_001–010)** — informative test names, single and multi-file bugs
+### Standard slice (mini_001–010) — informative test names
 
-**Reflection-critical slice (mini_011–015)** — generic test names (`test_regression_N`), cascade bugs across multiple files, vague issue descriptions, wrong-file traps
+| ID | Bug | Domain |
+|---|---|---|
+| mini_001 | `retry()` catches `PermanentError` (should not retry) | Error handling |
+| mini_002 | `paginate()` off-by-one in slice end | Pagination |
+| mini_003 | `median()` wrong for even-length inputs | Statistics |
+| mini_004 | JSONL reader drops last record + writer missing `\n` | File I/O |
+| mini_005 | `merge_config()` shallow merge loses sibling keys | Config merging |
+| mini_006 | Anchor normalization bug duplicated across 3 files | Text processing |
+| mini_007 | `safe_join()` bans all nested paths | Path handling |
+| mini_008 | `group_rows()` uses groupby on non-contiguous data | Data grouping |
+| mini_009 | `retry_after` parser: int-only, crashes on HTTP-date | HTTP parsing |
+| mini_010 | CSV parser splits on commas inside quoted fields | CSV parsing |
 
-The reflection-critical slice is designed so that test-name grounding alone is insufficient. The agent must encode and apply a conceptual lesson to make progress — it cannot just grep for the failing test name and open the obvious file.
+### Reflection-critical slice — generic test names, cascade bugs, tight budget
 
-Example cascade bug (mini_015):
-- **Bug A** (`enricher.py`): `e.priority = e.priority or default` — replaces `0` with a default value because `0` is falsy
-- **Bug B** (`reducer.py`): `if e.priority:` — silently skips all zero-priority events
-- Fixing Bug A makes some tests pass, but Bug B still silently drops data. The agent must iterate to find and fix both.
+| ID | Bug A | Bug B | Design |
+|---|---|---|---|
+| mini_011 | `merge.py`: `or` drops falsy values | `serialize.py`: `if v` drops falsy | Two-file shared bug pattern |
+| mini_012 | `cache.py`: key ignores locale+mode | n/a | Issue implicates `render.py` (wrong-file trap) |
+| mini_013 | `validator.py`: drops falsy fields | `serializer.py`: or-merge overwrites record with defaults | Wrong-file trap: issue implicates `pipeline.py` |
+| mini_014 | `aggregator.py`: groups by ID instead of category | n/a | Calibration task (too easy for this model) |
+| mini_015 | `enricher.py`: `or`-defaults 0-valued fields | `reducer.py`: `if e.priority` skips 0s | Pathological cascade: wrong fix order makes reflection anti-helpful |
+| mini_016 | `summarizer.py`: plain avg instead of weighted | `record_ops.py`: `:.2f` truncates precision | **Confirmed reflection-critical** (3× replicated) |
+| mini_017 | `aggregator.py`: divides by entry count not requests | `entry_log.py`: `int()` truncates float error counts | **Confirmed reflection-critical** (validated) |
 
 ---
 
@@ -91,12 +168,12 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-### API Key
+### API Keys
 
-PatchLoop uses the OpenAI-compatible API format. **Cerebras is the recommended provider** — it has a generous free tier (14,400 requests/day) and runs fast.
+**Cerebras is the recommended provider** — generous free tier (14,400 requests/day), fast inference.
 
 ```bash
-# Recommended: Cerebras (free — https://cloud.cerebras.ai)
+# Cerebras (free — https://cloud.cerebras.ai)
 export CEREBRAS_API_KEY=your_key_here
 # base URL is auto-configured; use --model gpt-oss-120b
 ```
@@ -106,7 +183,6 @@ Other supported providers:
 ```bash
 # Google Gemini (free — https://aistudio.google.com)
 export GEMINI_API_KEY=your_key_here
-# default model: gemini-2.5-flash
 
 # Groq or any OpenAI-compatible endpoint
 export LLM_API_KEY=your_key_here
@@ -120,37 +196,25 @@ export LLM_BASE_URL=https://api.groq.com/openai/v1
 ### Run a single task
 
 ```bash
-# Run one task with one baseline
-patchloop run mini_001 --model gpt-oss-120b
-
-# Specify baseline
-patchloop run mini_004 --baseline loop --model gpt-oss-120b
-
-# Constrain the search budget (tool calls per planning step)
-patchloop run mini_006 --baseline loop_reflect --model gpt-oss-120b --tool-rounds 8
+patchloop run mini_016 --model gpt-oss-120b --tool-rounds 6
+patchloop run mini_016 --baseline loop_reflect --model gpt-oss-120b --tool-rounds 6
 ```
 
-### Run the full benchmark
+### Run the benchmark
 
 ```bash
-# All tasks × all baselines
-patchloop bench --model gpt-oss-120b
-
-# Specific tasks and baselines
+# Reflection-critical slice, 3 reps each (recommended)
 patchloop bench \
-  -t mini_004 -t mini_005 -t mini_006 \
-  -b loop -b loop_reflect \
-  --model gpt-oss-120b
-
-# Averaged over multiple repetitions (recommended for credible results)
-patchloop bench \
-  -t mini_004 -t mini_005 -t mini_006 \
-  -b loop -b loop_reflect \
+  -t mini_016 -t mini_017 \
+  -b loop -b loop_testnames -b loop_reflect \
   --model gpt-oss-120b \
-  --tool-rounds 8 \
+  --tool-rounds 6 \
   --num-runs 3 \
   --run-delay 30 \
   --call-delay 7
+
+# All tasks × all baselines
+patchloop bench --model gpt-oss-120b
 ```
 
 ### Flags
@@ -159,9 +223,9 @@ patchloop bench \
 |---|---|---|
 | `--model` | `gemini-2.5-flash` | LLM model |
 | `--tool-rounds` | `15` | Max tool calls per planning step |
-| `--num-runs` | `1` | Repetitions per task/baseline (for averaging) |
+| `--num-runs` | `1` | Repetitions per task/baseline |
 | `--run-delay` | `30` | Seconds between repetitions |
-| `--call-delay` | `0` | Seconds between individual API calls (rate pacing) |
+| `--call-delay` | `0` | Seconds between individual API calls |
 
 ---
 
@@ -196,7 +260,7 @@ patchloop/
 
 ---
 
-## Key Design Details
+## Key Implementation Details
 
 **Pure Python diff application** — PatchLoop does not use `git apply`. It implements its own unified diff applier that searches for context blocks line-by-line rather than trusting the `@@` line numbers in the patch. This makes it robust to LLM-generated patches with slightly wrong offsets.
 
@@ -206,16 +270,14 @@ patchloop/
 
 **Structured reflection** — Reflections are JSON objects with fields: `what_failed`, `root_cause_hypothesis`, `patch_summary`, `lesson`. Only the `lesson` field is injected into subsequent prompts, keeping the signal tight.
 
+**Tool round budget** — `--tool-rounds` controls how many tool calls (file reads, searches) the agent can make per planning step. Lowering this creates search pressure: the agent cannot read every file in one pass and must choose. At `tool_rounds=6` on 11-file repos, the model reads 3–4 files per iteration — enough to fix Bug A but not enough to independently discover Bug B.
+
 ---
 
 ## The Hypothesis
 
 > Reflection becomes load-bearing when search is scarce and the next action is ambiguous.
 
-Not universally. Not just because a repo is large. The key design constraint for reflection-critical tasks is **selective search pressure without leaking the invariant** — the issue description, test names, and code must not point too directly at the bug. The agent must choose which files to explore, and when it chooses wrong, the structured lesson needs to encode something the test name alone does not.
+Not universally. Not just because a repo is large. The condition is **selective search pressure without leaking the invariant**: the issue description, test names, and file names must not point directly at the second bug. The agent must choose which files to explore, and when it chooses wrong, the structured lesson encodes something that neither the test name nor the issue description contains.
 
----
-
-## Status
-
-Active research project. Infrastructure and benchmark suite are complete. Averaged multi-run results across the reflection-critical task slice are in progress.
+On standard tasks — where `FAILED test_writer_terminates_each_record_with_newline` points straight to the writer — test-name grounding is sufficient and reflection adds nothing. On reflection-critical tasks — where `FAILED test_regression_04` tells you nothing about which of 11 files to open next — the structured lesson is the only signal that breaks the cycle.
