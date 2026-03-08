@@ -24,7 +24,7 @@ formal benchmark comparing four baselines.
 
 ## Current Status
 
-**16 tasks built. mini_016 validated with 3× replication — first confirmed reflection-critical task with clean baseline separation.**
+**17 tasks built. mini_016 validated (3× replication). mini_017 validated (single run) — corroborates mini_016 with clean baseline separation.**
 
 ### Completed this project so far
 
@@ -320,21 +320,19 @@ formal benchmark comparing four baselines.
 ### Next session priority
 
 **Current standing:**
-- mini_016 validated with 3× replication: loop_reflect=66.7%, loop=loop_testnames=33.3%
-- This is the first clean replicated result showing reflection outperforming all other baselines
+- mini_016: 3× replicated — loop_reflect=66.7%, loop=loop_testnames=33.3%
+- mini_017: single validation run — loop_reflect=100% (RESOLVED 3 iters), loop=0% (FAILED 5 iters)
+- Two independent reflection-critical tasks with consistent baseline separation
 - CEREBRAS_API_KEY is in ~/.zshenv — no manual setup needed
 
 **What's left:**
-1. **Write up the research story** — the README is still the default skeleton. A clear summary of
+1. **Run mini_017 3× replication** to corroborate the single-run result (same command as mini_016):
+   ```bash
+   patchloop bench -t mini_017 -b loop -b loop_testnames -b loop_reflect --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 30 --call-delay 7
+   ```
+2. **Write up the research story** — the README is still the default skeleton. A clear summary of
    what was built, what was measured, and what was found belongs in README.md.
-2. **Optionally build a second reflection-critical task** to corroborate mini_016 and reduce the
-   "one lucky task" concern. Design rule: generic file name, tight tool budget, clean cascade.
-3. **Run mini_016 with single_shot baseline** to complete the full 4-baseline picture.
-
-**Command for single_shot validation:**
-```bash
-patchloop bench -t mini_016 -b single_shot --model gpt-oss-120b --tool-rounds 6 --num-runs 3
-```
+3. **Optionally run single_shot baseline on mini_016/017** to complete the 4-baseline picture.
 
 **The research story in one paragraph:**
 Reflection produces measurably better outcomes specifically when (a) test names are generic and
@@ -345,6 +343,22 @@ reflection adds nothing. On reflection-critical tasks (generic names + tight bud
 loop_reflect doubles the resolve rate vs loop and loop_testnames.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
+
+**Session 16 — mini_017 built and validated:**
+- Built mini_017 (log_aggregator): 11-file pipeline, second reflection-critical cascade task.
+  - Bug A (aggregator.py): `error_rate = total_errors / len(entries)` — divides by entry count, not total_requests.
+    Tests 02,03,04,05 fail; test_01 passes (single entry, same result both ways).
+  - Bug B (entry_log.py): `int(stats["total_errors"])` truncates float error counts.
+    Only manifests after fixing Bug A. test_04 uses error_count=14.25 → truncated to 14.
+  - Generic file name: `entry_log.py` sounds like an audit log, not a numeric conversion module.
+  - Issue description points to "aggregation or statistics persistence" without naming files.
+- **Validation results** (tool_rounds=6, gpt-oss-120b, single run):
+  - loop: **FAILED** (5 iters, 20% repeat failures) — stuck on aggregator.py, never reaches entry_log.py
+  - loop_reflect: **RESOLVED** (3 iters, 0 repeat failures, 9 LOC changed)
+  - Clean baseline separation on first run, mirrors mini_016 pattern.
+- **Design rule confirmed**: generic file name + tight tool budget + clean cascade = reflection-critical task.
+  Two independent tasks now show the same pattern.
+- Report: runs/report_1772980823.json
 
 **Session 15 — mini_016 redesign + 3× confirmed replication:**
 - **Docstring breadcrumb removed**: summarizer.py previously named `value_formatter.py` directly.
@@ -600,9 +614,10 @@ Designed so loop_testnames cannot win just from the test name — the conceptual
 | mini_014 | aggregator uses `t.id or t.category` (groups by ID not category) | hard | 7-file report pipeline; wrong-file trap (issue says formatter). Solved by single_shot (0 iters) |
 | mini_015 | enricher `or`-defaults 0/0.0 fields; reducer `if e.priority` skips 0-priority | hard | 7-file event pipeline; cascade: fix enricher reveals reducer bug; issue is vague |
 
-All 15 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
+All 17 repos verified: tests fail on buggy code. All stdlib-only, no pip deps.
 mini_014 NOTE: too easy — model patched it without using any tools. Keep as calibration task only.
 mini_016 NOTE: bug B file is record_ops.py (renamed from value_formatter.py). Run with --tool-rounds 6.
+mini_017 NOTE: bug B file is entry_log.py (sounds like audit log, not numeric conversion). Run with --tool-rounds 6.
 
 ### mini_016 (reflection-critical — CONFIRMED 3× replication)
 | ID       | Bug                                    | Difficulty | Design intent |
@@ -629,6 +644,27 @@ but 3× average confirms loop_reflect consistently ahead.
 - `# BUG:` comment kept in summarizer.py — easy bug A is intentional (cascade requires iter 1 fix)
 
 Report: runs/report_1772977530.json
+
+### mini_017 (reflection-critical — single validation run)
+| ID       | Bug                                    | Difficulty | Design intent |
+|----------|----------------------------------------|------------|---------------|
+| mini_017 | aggregator.py wrong denominator + entry_log.py int() truncation | hard | 11-file log pipeline; fix aggregator (4/5 pass) then entry_log; loop gets stuck, loop_reflect escapes via reflection lesson |
+
+**Single-run validation results** (tool_rounds=6, gpt-oss-120b):
+
+| Baseline | Result | Iters | Runtime | Repeat failures |
+|---|---|---|---|---|
+| loop | FAILED | 5 | 256s | 20.0% |
+| loop_reflect | **RESOLVED** | **3** | 155s | **0.0%** |
+
+**Key design decisions:**
+- Bug B file named `entry_log.py` — sounds like an audit trail, not a float-to-int conversion module
+- `persist_stats` / `persist_all` function names sound like serialization, not numeric coercion
+- Docstring framed as "stable record structure for serialization", not "type conversion"
+- tool_rounds=6: same pressure as mini_016
+- Cascade verified: fix aggregator.py → 4/5 pass; test_04 still fails (error_count=14 instead of 14.25)
+
+Report: runs/report_1772980823.json
 
 ---
 
