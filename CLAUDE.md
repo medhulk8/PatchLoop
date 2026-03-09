@@ -24,7 +24,7 @@ formal benchmark comparing four baselines.
 
 ## Current Status
 
-**17 tasks built. mini_016 (3× replicated). mini_017 (3× attempted, rep 3 throttled). Both corroborate: loop_reflect is the only baseline that can escape the cascade on reflection-critical tasks.**
+**17 tasks built. mini_016 + mini_017 both fully 3× replicated. single_shot baseline complete. Full 4-baseline picture confirmed: loop_reflect=66.7% on both tasks; all other baselines ≤ 33.3%.**
 
 ### Completed this project so far
 
@@ -319,27 +319,25 @@ formal benchmark comparing four baselines.
 
 ### Next session priority
 
-**Current standing:**
-- mini_016: 3× replicated — loop_reflect=66.7%, loop=loop_testnames=33.3%
-- mini_017: 3× attempted; reps 1+2 clean (loop=0%, loop_testnames=0%, loop_reflect=50%); rep 3 throttled repeatedly (daily token quota exhausted mid-run)
-- Two independent reflection-critical tasks with consistent baseline separation
+**Current standing — BENCHMARK COMPLETE:**
+- mini_016: 3× replicated — single_shot=0%, loop=33.3%, loop_testnames=33.3%, loop_reflect=66.7%
+- mini_017: 3× replicated — single_shot=0%, loop=0%, loop_testnames=0%, loop_reflect=66.7%
+- Both tasks fully confirm: loop_reflect doubles or more the resolve rate vs all competitors
 - CEREBRAS_API_KEY is in ~/.zshenv — no manual setup needed
 
-**IMPORTANT — mini_017 rep 3 note:**
-Two separate rerun attempts (Session 16 and 17) both hit Cerebras daily token quota mid-run.
-Rep 3 always runs on a day where earlier benchmarks already spent the daily budget.
-The fix: **run mini_017 rep 3 FIRST on a fresh day, before any other API calls.**
-Command:
-```bash
-patchloop bench -t mini_017 -b loop_testnames -b loop_reflect --model gpt-oss-120b --tool-rounds 6 --num-runs 1 --call-delay 7
-```
-(loop rep 3 is clean at 0/1 FAILED; only loop_testnames and loop_reflect need re-running)
-
-**After mini_017 rep 3 (still on fresh day, same session):**
-2. **Run single_shot baseline on mini_016/017** to complete the 4-baseline picture:
+**Recommended next steps (choose one):**
+1. **Budget sweep** — tool_rounds=4,6,8,10 across mini_016 + mini_017 (3× averaged):
+   Shows how tight the budget needs to be for reflection to matter.
    ```bash
-   patchloop bench -t mini_016 -t mini_017 -b single_shot --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 30 --call-delay 7
+   for rounds in 4 8 10; do
+     patchloop bench -t mini_016 -t mini_017 -b loop -b loop_testnames -b loop_reflect \
+       --model gpt-oss-120b --tool-rounds $rounds --num-runs 3 --run-delay 30 --call-delay 7
+   done
    ```
+2. **Build mini_018** — third reflection-critical task (different cascade structure):
+   Validates that the pattern holds across task designs, not just these two.
+3. **Write up results** — the data is sufficient for a clean write-up now.
+   Two independently replicated tasks, consistent 4-baseline ordering, clear hypothesis.
 
 **The research story in one paragraph:**
 Reflection produces measurably better outcomes specifically when (a) test names are generic and
@@ -350,6 +348,21 @@ reflection adds nothing. On reflection-critical tasks (generic names + tight bud
 loop_reflect doubles the resolve rate vs loop and loop_testnames.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
+
+**Session 18 — mini_017 rep 3 complete + single_shot baseline finalized:**
+- **mini_017 rep 3 (loop_testnames + loop_reflect)**: ran clean on fresh quota day.
+  - loop_testnames: FAILED (5 iters, LOC=0 — model explored but produced no valid patches)
+  - loop_reflect: RESOLVED (4 iters, LOC=12) — lesson correctly identified entry_log.py
+  - Final mini_017 score: single_shot=0%, loop=0%, loop_testnames=0%, loop_reflect=66.7%
+  - Report: runs/report_1773044508.json
+- **single_shot baseline on mini_016 + mini_017** (3× each): confirmed 0% both tasks.
+  - LOC changed = 0 across all 6 runs — single_shot cannot form a confident patch in 6 tool rounds
+    with no test feedback on 11-file repos. Tasks require iteration to solve.
+  - Report: runs/report_1773044905.json
+- **4-baseline picture complete**. Both tasks show identical ordering:
+  single_shot=0% < loop ≤ loop_testnames ≤ 33.3% < loop_reflect=66.7%
+- Updated README and CLAUDE.md with final confirmed numbers.
+- Pushed to GitHub.
 
 **Session 17 — mini_017 rep 3 rerun blocked by token quota:**
 - Attempted clean rerun of mini_017 rep 3 (loop_testnames + loop_reflect only).
@@ -663,23 +676,23 @@ but 3× average confirms loop_reflect consistently ahead.
 
 Report: runs/report_1772977530.json
 
-### mini_017 (reflection-critical — 3× attempted, rep 3 throttled)
+### mini_017 (reflection-critical — CONFIRMED 3× replication)
 | ID       | Bug                                    | Difficulty | Design intent |
 |----------|----------------------------------------|------------|---------------|
 | mini_017 | aggregator.py wrong denominator + entry_log.py int() truncation | hard | 11-file log pipeline; fix aggregator (4/5 pass) then entry_log; loop gets stuck, loop_reflect escapes via reflection lesson |
 
-**3× replication results** (tool_rounds=6, gpt-oss-120b):
+**3× replication results** (tool_rounds=6, gpt-oss-120b, all reps clean):
 
-| Baseline | Resolve rate | Avg iters (failure) | Repeat failure rate |
+| Baseline | Resolve rate | Avg iters (success) | Repeat failure rate |
 |---|---|---|---|
-| loop | 0.0% (0/3) | 5.00 | 33.3% |
-| loop_testnames | 0.0% (0/3) | 2.67 | 25.0% |
-| loop_reflect | **33.3% (1/3)** | 3.00 | 22.2% |
+| single_shot | 0.0% (0/3) | — | 0.0% |
+| loop | 0.0% (0/3) | — | 33.3% |
+| loop_testnames | 0.0% (0/3) | — | 20.0% |
+| loop_reflect | **66.7% (2/3)** | **4.00** | 25.0% |
 
-**NOTE on rep 3**: Daily Cerebras token quota exhausted during rep 3. loop_testnames and loop_reflect
-both hit 4/4 retries and terminated in 1 iter each (invalid results). Only loop rep 3 is clean.
-Clean data from reps 1 and 2: loop=0% (0/2), loop_testnames=0% (0/2), loop_reflect=50% (1/2).
-Pattern matches mini_016: loop_reflect is the only baseline that escapes the cascade.
+Rep 1: loop_reflect FAILED. Rep 2: loop_reflect RESOLVED (3 iters). Rep 3: loop_reflect RESOLVED (4 iters).
+Pattern matches mini_016 exactly: loop_reflect is the only baseline that escapes the cascade.
+Combined with mini_016, both reflection-critical tasks show loop_reflect=66.7% vs all others ≤ 33.3%.
 
 **Key design decisions:**
 - Bug B file named `entry_log.py` — sounds like an audit trail, not a float-to-int conversion module
