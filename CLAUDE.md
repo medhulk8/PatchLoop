@@ -24,7 +24,7 @@ formal benchmark comparing four baselines.
 
 ## Current Status
 
-**17 tasks built. mini_016 + mini_017 both fully 3× replicated. single_shot baseline complete. Full 4-baseline picture confirmed: loop_reflect=66.7% on both tasks; all other baselines ≤ 33.3%.**
+**17 tasks built. Budget sweep tool_rounds=4/6/8 complete. tool_rounds=10 NEXT (needs fresh quota day). loop_reflect holds 66.7% at all valid budget points; reflection advantage is task-selective at 8 rounds (only from mini_017).**
 
 ### Completed this project so far
 
@@ -327,19 +327,24 @@ formal benchmark comparing four baselines.
 
 **Budget sweep in progress (run first thing on fresh quota days):**
 
-| tool_rounds | Status | Result |
-|---|---|---|
-| 4 | DONE | 0% all baselines, LOC=0 — below exploration floor |
-| 6 | DONE | loop_reflect=66.7%, others ≤ 33.3% — main result |
-| 8 | **NEXT** | Run first thing on next fresh quota day |
-| 10 | Pending | |
+| tool_rounds | Status | loop | loop_testnames | loop_reflect |
+|---|---|---|---|---|
+| 4 | DONE | 0% | 0% | 0% |
+| 6 | DONE | 33.3% | 33.3% | **66.7%** |
+| 8 | DONE | 50.0% | 33.3% | **66.7%** |
+| 10 | **NEXT** | TBD | TBD | TBD |
 
-**Next session first command (tool_rounds=8):**
+**tool_rounds=8 key finding**: loop_reflect holds at 66.7% while loop improves to 50%.
+The advantage now comes entirely from mini_017: loop=0%, loop_testnames=0%, loop_reflect=67% on that task.
+mini_016 is fully reachable by brute-force at 8 rounds (loop=100%, all baselines ≥ 67%).
+mini_017 remains exclusive to loop_reflect even at 8 rounds — harder task, lesson still load-bearing.
+Report: runs/report_1773075316.json
+
+**Next session first command (if tool_rounds=10 doesn't complete today):**
 ```bash
 patchloop bench -t mini_016 -t mini_017 -b loop -b loop_testnames -b loop_reflect \
-  --model gpt-oss-120b --tool-rounds 8 --num-runs 3 --run-delay 30 --call-delay 7
+  --model gpt-oss-120b --tool-rounds 10 --num-runs 3 --run-delay 30 --call-delay 7
 ```
-Then tool_rounds=10 immediately after (or next fresh day if quota runs out).
 
 **tool_rounds=4 findings (Session 19):**
 - All baselines: 0% resolve rate, LOC changed=0 on both tasks, all 3 reps
@@ -359,6 +364,26 @@ reflection adds nothing. On reflection-critical tasks (generic names + tight bud
 loop_reflect doubles the resolve rate vs loop and loop_testnames.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
+
+**Session 20 — Budget sweep tool_rounds=8 complete + tool_rounds=10 partial (quota):**
+- **tool_rounds=8 full results** (2 tasks × 3 baselines × 3 reps = 18 runs):
+  - loop: 50.0% (3/6), avg iters (success)=2.33, repeat failure rate=11.8%
+  - loop_testnames: 33.3% (2/6), avg iters=2.00, repeat failure rate=15.4%
+  - loop_reflect: 66.7% (4/6), avg iters=2.25, repeat failure rate=6.7%
+  - Per-task: mini_016: loop=3/3 (100%), loop_testnames=2/3 (67%), loop_reflect=2/3 (67%)
+  - Per-task: mini_017: loop=0/3 (0%), loop_testnames=0/3 (0%), loop_reflect=2/3 (67%)
+  - Key finding: mini_016 becomes fully brute-forceable at 8 rounds. loop_reflect advantage
+    now comes entirely from mini_017. mini_017 remains exclusive to loop_reflect at 8 rounds.
+  - Report: runs/report_1773075316.json
+- **tool_rounds=10 attempt immediately after** — stopped by token quota after loop rep 1:
+  - mini_016 loop rep 1: RESOLVED in 1 iteration (143s) — brute-force complete at 10 rounds
+  - mini_017 loop rep 1: FAILED in 5 iterations (429s) — still hard at 10 rounds for loop
+  - Remaining reps/baselines invalid — quota spent. Run stopped manually.
+  - Conclusion: tool_rounds=10 needs its own dedicated fresh-quota day (first API calls).
+- **Codex P2 fixes** also applied this session (cli.py):
+  - bench: added run_delay >= 0 and call_delay >= 0 guards
+  - run: added tool_rounds >= 1 and call_delay >= 0 guards to match bench
+- **Next**: tool_rounds=10 full sweep first thing on next fresh quota day (command below).
 
 **Session 19 — Codex P2 fixes + budget sweep tool_rounds=4:**
 - **Codex P2 fixes applied** (cli.py):
