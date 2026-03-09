@@ -325,19 +325,30 @@ formal benchmark comparing four baselines.
 - Both tasks fully confirm: loop_reflect doubles or more the resolve rate vs all competitors
 - CEREBRAS_API_KEY is in ~/.zshenv — no manual setup needed
 
-**Recommended next steps (choose one):**
-1. **Budget sweep** — tool_rounds=4,6,8,10 across mini_016 + mini_017 (3× averaged):
-   Shows how tight the budget needs to be for reflection to matter.
-   ```bash
-   for rounds in 4 8 10; do
-     patchloop bench -t mini_016 -t mini_017 -b loop -b loop_testnames -b loop_reflect \
-       --model gpt-oss-120b --tool-rounds $rounds --num-runs 3 --run-delay 30 --call-delay 7
-   done
-   ```
-2. **Build mini_018** — third reflection-critical task (different cascade structure):
-   Validates that the pattern holds across task designs, not just these two.
-3. **Write up results** — the data is sufficient for a clean write-up now.
-   Two independently replicated tasks, consistent 4-baseline ordering, clear hypothesis.
+**Budget sweep in progress (run first thing on fresh quota days):**
+
+| tool_rounds | Status | Result |
+|---|---|---|
+| 4 | DONE | 0% all baselines, LOC=0 — below exploration floor |
+| 6 | DONE | loop_reflect=66.7%, others ≤ 33.3% — main result |
+| 8 | **NEXT** | Run first thing on next fresh quota day |
+| 10 | Pending | |
+
+**Next session first command (tool_rounds=8):**
+```bash
+patchloop bench -t mini_016 -t mini_017 -b loop -b loop_testnames -b loop_reflect \
+  --model gpt-oss-120b --tool-rounds 8 --num-runs 3 --run-delay 30 --call-delay 7
+```
+Then tool_rounds=10 immediately after (or next fresh day if quota runs out).
+
+**tool_rounds=4 findings (Session 19):**
+- All baselines: 0% resolve rate, LOC changed=0 on both tasks, all 3 reps
+- Model iterates (4+ iters) but patches fail to apply — 4 rounds is below the exploration
+  floor for 11-file repos. Model cannot read enough to form a valid diff.
+- loop_reflect rep 1 collapsed to 1 iter (NO_DIFF in iter 1) — stochastic, not systematic
+  (rep 2 ran 5 iters fine). Likely the model didn't commit to a diff in its only 4 tool calls.
+- loop_reflect rep 3 partially throttled (iters=2 with 942s on mini_017 = quota retries).
+- Report: runs/report_1773050027.json
 
 **The research story in one paragraph:**
 Reflection produces measurably better outcomes specifically when (a) test names are generic and
@@ -348,6 +359,19 @@ reflection adds nothing. On reflection-critical tasks (generic names + tight bud
 loop_reflect doubles the resolve rate vs loop and loop_testnames.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
+
+**Session 19 — Codex P2 fixes + budget sweep tool_rounds=4:**
+- **Codex P2 fixes applied** (cli.py):
+  - `bench`: added `run_delay >= 0` and `call_delay >= 0` guards (prevent ValueError from time.sleep)
+  - `run`: added `tool_rounds >= 1` and `call_delay >= 0` guards to match bench
+- **Budget sweep tool_rounds=4** (2 tasks × 3 baselines × 3 reps):
+  - All baselines: 0% resolve rate, LOC changed=0 — below the exploration floor
+  - Model iterates (3-5 iters) but produces patches that fail to apply
+  - loop_reflect rep 1 stochastically collapsed to 1 iter (NO_DIFF); rep 2 ran fine
+  - loop_reflect rep 3 throttled by daily token quota (iters=2 invalid for mini_017)
+  - Conclusion: tool_rounds=4 is the "sub-floor" data point for 11-file repos
+  - Report: runs/report_1773050027.json
+- **Next**: tool_rounds=8 first thing tomorrow morning
 
 **Session 18 — mini_017 rep 3 complete + single_shot baseline finalized:**
 - **mini_017 rep 3 (loop_testnames + loop_reflect)**: ran clean on fresh quota day.
