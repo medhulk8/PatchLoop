@@ -90,6 +90,10 @@ def bench(
         raise typer.BadParameter("--num-runs must be >= 1", param_hint="'--num-runs'")
     if tool_rounds < 1:
         raise typer.BadParameter("--tool-rounds must be >= 1", param_hint="'--tool-rounds'")
+    if run_delay < 0:
+        raise typer.BadParameter("--run-delay must be >= 0", param_hint="'--run-delay'")
+    if call_delay < 0:
+        raise typer.BadParameter("--call-delay must be >= 0", param_hint="'--call-delay'")
 
     runner = BenchmarkRunner(
         tasks_dir=tasks_dir,
@@ -146,6 +150,11 @@ def run(
         patchloop run mini_002 --baseline single_shot
         patchloop run mini_004 --tool-rounds 4
     """
+    if tool_rounds < 1:
+        raise typer.BadParameter("--tool-rounds must be >= 1", param_hint="'--tool-rounds'")
+    if call_delay < 0:
+        raise typer.BadParameter("--call-delay must be >= 0", param_hint="'--call-delay'")
+
     from patchloop.eval.baselines import build_agent
     from patchloop.environment.task import Task
 
