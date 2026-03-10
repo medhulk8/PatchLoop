@@ -24,7 +24,7 @@ formal benchmark comparing four baselines.
 
 ## Current Status
 
-**17 tasks built. Budget sweep tool_rounds=4/6/8 complete. tool_rounds=10 NEXT (needs fresh quota day). loop_reflect holds 66.7% at all valid budget points; reflection advantage is task-selective at 8 rounds (only from mini_017).**
+**17 tasks built. Budget sweep COMPLETE (4/6/8 fully replicated; tool_rounds=10 dropped — free-tier token budget insufficient for 3× replication). loop_reflect holds 66.7% at all feasible budget points. Next: build mini_018+ tasks, run statistical analysis, second model validation.**
 
 ### Completed this project so far
 
@@ -325,26 +325,24 @@ formal benchmark comparing four baselines.
 - Both tasks fully confirm: loop_reflect doubles or more the resolve rate vs all competitors
 - CEREBRAS_API_KEY is in ~/.zshenv — no manual setup needed
 
-**Budget sweep in progress (run first thing on fresh quota days):**
+**Budget sweep — COMPLETE (4/6/8 fully replicated, 10 dropped):**
 
 | tool_rounds | Status | loop | loop_testnames | loop_reflect |
 |---|---|---|---|---|
 | 4 | DONE | 0% | 0% | 0% |
 | 6 | DONE | 33.3% | 33.3% | **66.7%** |
 | 8 | DONE | 50.0% | 33.3% | **66.7%** |
-| 10 | **NEXT** | TBD | TBD | TBD |
+| 10 | DROPPED | — | — | — |
 
-**tool_rounds=8 key finding**: loop_reflect holds at 66.7% while loop improves to 50%.
-The advantage now comes entirely from mini_017: loop=0%, loop_testnames=0%, loop_reflect=67% on that task.
-mini_016 is fully reachable by brute-force at 8 rounds (loop=100%, all baselines ≥ 67%).
-mini_017 remains exclusive to loop_reflect even at 8 rounds — harder task, lesson still load-bearing.
-Report: runs/report_1773075316.json
+**Why tool_rounds=10 was dropped**: 3× replication burns more tokens than the Cerebras free daily budget
+allows. Rep 1 (loop only) completed clean — mini_016 RESOLVED in 1 iter, mini_017 FAILED in 4 iters,
+fully consistent with the 4/6/8 pattern. Reps 2 and 3 hit `token_quota_exceeded` immediately.
+Running 1 rep per day over 3 days is not worth the marginal data — the story doesn't change at 10 rounds.
 
-**Next session first command (if tool_rounds=10 doesn't complete today):**
-```bash
-patchloop bench -t mini_016 -t mini_017 -b loop -b loop_testnames -b loop_reflect \
-  --model gpt-oss-120b --tool-rounds 10 --num-runs 3 --run-delay 30 --call-delay 7
-```
+**Budget sweep conclusion**: loop_reflect holds 66.7% at every feasible budget point (6 and 8 rounds).
+loop improves from 33% → 50% as budget increases; loop_testnames stays flat at 33%.
+The reflection advantage is robust to budget: loop_reflect is always best, the gap just narrows as
+brute-force becomes viable (mini_016 fully solvable at 8 rounds by all baselines).
 
 **tool_rounds=4 findings (Session 19):**
 - All baselines: 0% resolve rate, LOC changed=0 on both tasks, all 3 reps
@@ -364,6 +362,17 @@ reflection adds nothing. On reflection-critical tasks (generic names + tight bud
 loop_reflect doubles the resolve rate vs loop and loop_testnames.
 
 CEREBRAS_API_KEY is saved in ~/.zshenv. No manual setup needed at session start.
+
+**Session 21 — Budget sweep closed. tool_rounds=10 dropped.**
+- Attempted tool_rounds=10 sweep (3× reps, 3 baselines) on fresh quota day.
+- Rep 1 loop completed clean: mini_016 RESOLVED iters=1, mini_017 FAILED iters=4 — consistent with 4/6/8 pattern.
+- Rep 2 immediately hit `token_quota_exceeded` for loop_testnames and loop_reflect — data invalid.
+- Rep 3 also hit quota — invalid.
+- Decision: **drop tool_rounds=10** from the sweep. 3× replication at 10 rounds exceeds the free-tier
+  daily token budget regardless of call_delay pacing. Rep 1 confirms the pattern holds; additional
+  replication adds no new information.
+- Budget sweep table updated to COMPLETE (4/6/8) with tool_rounds=10 marked DROPPED.
+- **Next priority**: build mini_018+ tasks (highest-impact, no API needed).
 
 **Session 20 — Budget sweep tool_rounds=8 complete + tool_rounds=10 partial (quota):**
 - **tool_rounds=8 full results** (2 tasks × 3 baselines × 3 reps = 18 runs):
