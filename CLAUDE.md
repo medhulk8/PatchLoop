@@ -14,7 +14,7 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 ## Current Status
 
-**17 tasks built. Budget sweep COMPLETE (tool_rounds 4/6/8, 3× replicated). loop_reflect holds 66.7% at all feasible budgets. Next: build mini_018+ tasks (no API needed), then statistical analysis.**
+**20 tasks built. Budget sweep COMPLETE (tool_rounds 4/6/8, 3× replicated). loop_reflect holds 66.7% at all feasible budgets. Next: run statistical analysis, second model validation (Groq), JSONL log trajectory analysis.**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 Reflection-critical tasks confirmed: `mini_016`, `mini_017` (both 3× replicated, loop_reflect=66.7%, all others ≤33.3%)
@@ -114,6 +114,9 @@ Confirmed working: `record_ops.py` (sounds like data ops, not formatting), `entr
 | mini_015 | enricher+reducer 0-value cascade | PATHOLOGICAL — reflector gives anti-helpful lessons |
 | mini_016 | summarizer avg + record_ops.py precision | **CONFIRMED** loop_reflect=66.7% (3×) |
 | mini_017 | aggregator denominator + entry_log.py truncation | **CONFIRMED** loop_reflect=66.7% (3×) |
+| mini_018 | rate_calc wrong divisor + job_ops.py precision | built, cascade verified |
+| mini_019 | shrink_calc wrong divisor + stock_log.py truncation | built, cascade verified |
+| mini_020 | score_calc wrong divisor + score_entry.py truncation | built, cascade verified |
 
 ---
 

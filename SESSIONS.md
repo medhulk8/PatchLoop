@@ -128,6 +128,15 @@ Full log of what was built/changed/found each session. For day-to-day working re
 - tool_rounds=10 attempted immediately after — stopped by quota after loop rep 1 (data invalid)
 - Report: runs/report_1773075316.json
 
+## Session 22 — mini_018, mini_019, mini_020 built and verified
+- Built 3 new reflection-critical tasks (mini_018, mini_019, mini_020), total now 20 tasks
+- All follow the same design: 11-file pipeline, Bug A = wrong divisor, Bug B = numeric precision in generic-named file
+- mini_018: rate_calc.py (÷ num_workers instead of elapsed_hours) + job_ops.py (:.2f loses precision for repeating decimals)
+- mini_019: shrink_calc.py (÷ closing_stock instead of opening_stock) + stock_log.py (int() truncation vs round())
+- mini_020: score_calc.py (÷ attempts instead of max_score) + score_entry.py (int() truncation vs round())
+- All cascades verified with pytest (3 steps: buggy → fix A only → fix both)
+- CLAUDE.md trimmed; SESSIONS.md updated
+
 ## Session 21 — Budget sweep closed, tool_rounds=10 dropped
 - Attempted full tool_rounds=10 sweep on fresh quota day
 - Rep 1 loop clean (mini_016 RESOLVED iters=1, mini_017 FAILED iters=4) — consistent with pattern
