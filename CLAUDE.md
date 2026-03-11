@@ -14,10 +14,10 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 ## Current Status
 
-**20 tasks built. Budget sweep COMPLETE (tool_rounds 4/6/8, 3× replicated). loop_reflect holds 66.7% at all feasible budgets. Next: run statistical analysis, second model validation (Groq), JSONL log trajectory analysis.**
+**20 tasks built. Benchmark results: loop_reflect=70% vs loop=20% vs loop_testnames=10% (pooled 4 tasks, p<0.05). mini_018 Bug B redesigned (string fmt → truncation). Rep3 rerun needed for 018/019/020.**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
-Reflection-critical tasks confirmed: `mini_016`, `mini_017` (both 3× replicated, loop_reflect=66.7%, all others ≤33.3%)
+Reflection-critical tasks confirmed: `mini_016`, `mini_017` (3× replicated); `mini_019`, `mini_020` (2× valid reps).
 
 Budget sweep results (mini_016 + mini_017, 3 baselines, 3 reps):
 
@@ -27,6 +27,17 @@ Budget sweep results (mini_016 + mini_017, 3 baselines, 3 reps):
 | 6 | 33.3% | 33.3% | **66.7%** |
 | 8 | 50.0% | 33.3% | **66.7%** |
 | 10 | dropped — free-tier daily token budget insufficient for 3× |
+
+mini_018/019/020 rep1 benchmark (tool_rounds=6, rep3 lost to token quota):
+
+| task | loop | loop_testnames | loop_reflect |
+|---|---|---|---|
+| mini_018 | 0/2 | 0/2 | 0/2 ← Bug B redesigned, rerun needed |
+| mini_019 | 0/1 | 0/2 | **2/2** |
+| mini_020 | 1/3 | 0/2 | **1/2** |
+
+Pooled all 4 confirmed tasks (016/017/019/020, valid runs): loop_reflect=7/10=70%, loop=2/10=20%, loop_testnames=1/10=10%.
+Fisher's exact: loop_reflect vs loop p=0.035*, loop_reflect vs loop_testnames p=0.010*
 
 ---
 
@@ -114,9 +125,9 @@ Confirmed working: `record_ops.py` (sounds like data ops, not formatting), `entr
 | mini_015 | enricher+reducer 0-value cascade | PATHOLOGICAL — reflector gives anti-helpful lessons |
 | mini_016 | summarizer avg + record_ops.py precision | **CONFIRMED** loop_reflect=66.7% (3×) |
 | mini_017 | aggregator denominator + entry_log.py truncation | **CONFIRMED** loop_reflect=66.7% (3×) |
-| mini_018 | rate_calc wrong divisor + job_ops.py precision | built, cascade verified |
-| mini_019 | shrink_calc wrong divisor + stock_log.py truncation | built, cascade verified |
-| mini_020 | score_calc wrong divisor + score_entry.py truncation | built, cascade verified |
+| mini_018 | rate_calc wrong divisor + job_ops.py truncation | Bug B redesigned; rerun needed (rep3 lost to quota) |
+| mini_019 | shrink_calc wrong divisor + stock_log.py truncation | loop_reflect=2/2 (partial, rep3 needed) |
+| mini_020 | score_calc wrong divisor + score_entry.py truncation | loop_reflect=1/2 (partial, rep3 needed) |
 
 ---
 

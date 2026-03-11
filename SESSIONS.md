@@ -128,10 +128,21 @@ Full log of what was built/changed/found each session. For day-to-day working re
 - tool_rounds=10 attempted immediately after — stopped by quota after loop rep 1 (data invalid)
 - Report: runs/report_1773075316.json
 
+## Session 23 — Benchmark on 018/019/020, statistical significance, mini_018 Bug B redesign
+- Ran 3-baseline bench on mini_018/019/020 (tool_rounds=6, 3 reps). Rep3 lost to token quota.
+- Valid results: mini_019 loop_reflect=2/2; mini_020 loop_reflect=1/2; mini_018 loop_reflect=0/2
+- mini_018's 0/2 explained: original Bug B (:.2f string format) was too hard to infer from tests alone
+- Redesigned mini_018 Bug B: int(rate*100)/100 truncation (same pattern as mini_017/019/020), cascade re-verified
+- Statistical analysis (pooled 016/017/019/020 valid runs, 10 per baseline):
+  loop_reflect=7/10=70%, loop=2/10=20%, loop_testnames=1/10=10%
+  Fisher's exact: vs loop p=0.035*, vs loop_testnames p=0.010* — **first p<0.05 result**
+- Created TASK_TAXONOMY.md and eval/analysis/ scripts (stats_016_017.py, stats_018_020.py)
+- Next: rerun mini_018/019/020 full 3× clean on fresh quota day
+
 ## Session 22 — mini_018, mini_019, mini_020 built and verified
 - Built 3 new reflection-critical tasks (mini_018, mini_019, mini_020), total now 20 tasks
 - All follow the same design: 11-file pipeline, Bug A = wrong divisor, Bug B = numeric precision in generic-named file
-- mini_018: rate_calc.py (÷ num_workers instead of elapsed_hours) + job_ops.py (:.2f loses precision for repeating decimals)
+- mini_018: rate_calc.py (÷ num_workers instead of elapsed_hours) + job_ops.py (int() truncation vs round())
 - mini_019: shrink_calc.py (÷ closing_stock instead of opening_stock) + stock_log.py (int() truncation vs round())
 - mini_020: score_calc.py (÷ attempts instead of max_score) + score_entry.py (int() truncation vs round())
 - All cascades verified with pytest (3 steps: buggy → fix A only → fix both)

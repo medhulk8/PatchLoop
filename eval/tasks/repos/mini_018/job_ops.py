@@ -2,13 +2,13 @@ def build_record(worker_id: str, rate: float) -> dict:
     """
     Assemble the final output record for a worker group.
 
-    Encodes the throughput rate as a stable string representation
-    suitable for downstream consumption and archival storage.
+    The throughput rate is stored as a two-decimal-precision value,
+    rounded for consistent reporting across worker configurations.
     """
-    # BUG: formats to only 2 decimal places, losing precision for repeating decimals
+    # BUG: truncates instead of rounds — int() discards the fractional part
     return {
         "worker_id": worker_id,
-        "rate": f"{rate:.2f}",
+        "rate": int(rate * 100) / 100,
     }
 
 
