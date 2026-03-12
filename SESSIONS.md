@@ -138,7 +138,12 @@ Full log of what was built/changed/found each session. For day-to-day working re
   - search_code: capped at 10 results (was unlimited)
   - Reflector was already capping stdout/stderr at 1500 chars each
 - Updated CLAUDE.md LLM providers table with verified free-tier TPD limits
-- Ran second benchmark attempt (bw2c2gz90) on mini_018/019/020 — heavy queue_exceeded traffic, results pending
+- Ran benchmark bw2c2gz90 on mini_018/019/020 (full 3×, rep3 loop_testnames/loop_reflect lost to quota)
+- FINDING: mini_019 loop=2/3 — NOT reflection-critical! `stock_log.py` was too discoverable (domain-named)
+- mini_020 CONFIRMED: loop=0/3, loop_testnames=0/2, loop_reflect=2/2 — cleanest result yet
+- mini_018: all loop_reflect runs were ERROR (quota/traffic). No valid data. Rerun needed.
+- Fix: renamed mini_019 Bug B file stock_log.py → event_log.py (generic, like record_ops/entry_log pattern)
+- mini_019 cascade re-verified: both bugs 4/5 fail, fix A only 1/5 fails (test_04), fix both 5/5 pass
 
 ## Session 23 — Benchmark on 018/019/020, statistical significance, mini_018 Bug B redesign
 - Ran 3-baseline bench on mini_018/019/020 (tool_rounds=6, 3 reps). Rep3 lost to token quota.

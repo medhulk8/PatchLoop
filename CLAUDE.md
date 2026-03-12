@@ -14,10 +14,9 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 ## Current Status
 
-**20 tasks built. Benchmark results: loop_reflect=70% vs loop=20% vs loop_testnames=10% (pooled 4 tasks, p<0.05). mini_018 Bug B redesigned (string fmt → truncation). Rep3 rerun needed for 018/019/020.**
+**20 tasks built. Confirmed reflection-critical: mini_016, mini_017 (3× each); mini_020 (2/2 valid). mini_019 Bug B file renamed (stock_log→event_log — was too discoverable). mini_018 rerun needed.**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
-Reflection-critical tasks confirmed: `mini_016`, `mini_017` (3× replicated); `mini_019`, `mini_020` (2× valid reps).
 
 Budget sweep results (mini_016 + mini_017, 3 baselines, 3 reps):
 
@@ -28,16 +27,18 @@ Budget sweep results (mini_016 + mini_017, 3 baselines, 3 reps):
 | 8 | 50.0% | 33.3% | **66.7%** |
 | 10 | dropped — free-tier daily token budget insufficient for 3× |
 
-mini_018/019/020 rep1 benchmark (tool_rounds=6, rep3 lost to token quota):
+Benchmark bw2c2gz90 (mini_018/019/020, valid runs only, rep3 loop_testnames/loop_reflect lost to quota):
 
-| task | loop | loop_testnames | loop_reflect |
-|---|---|---|---|
-| mini_018 | 0/2 | 0/2 | 0/2 ← Bug B redesigned, rerun needed |
-| mini_019 | 0/1 | 0/2 | **2/2** |
-| mini_020 | 1/3 | 0/2 | **1/2** |
+| task | loop | loop_testnames | loop_reflect | notes |
+|---|---|---|---|---|
+| mini_018 | 0/3 | 0/2 | 0/0 (all ERROR) | No valid loop_reflect data. Rerun needed. |
+| mini_019 | **2/3** | 1/1 | 1/1 | NOT reflection-critical! loop=67% already. Bug B file renamed. |
+| mini_020 | 0/3 | 0/2 | **2/2** | CONFIRMED reflection-critical. |
 
-Pooled all 4 confirmed tasks (016/017/019/020, valid runs): loop_reflect=7/10=70%, loop=2/10=20%, loop_testnames=1/10=10%.
-Fisher's exact: loop_reflect vs loop p=0.035*, loop_reflect vs loop_testnames p=0.010*
+**Key finding:** mini_019 solved by loop=2/3 because `stock_log.py` was too obviously named in a stock pipeline — model found it in 6 rounds. Renamed to `event_log.py`. Rerun needed.
+
+Pooled confirmed tasks (016/017/020 only): loop_reflect=6/7=86%, loop=1/9=11%, loop_testnames=1/7=14%.
+(Prior pooled 016+017+019+020 stats are invalidated by mini_019 not being reflection-critical.)
 
 ---
 
@@ -126,7 +127,7 @@ Confirmed working: `record_ops.py` (sounds like data ops, not formatting), `entr
 | mini_016 | summarizer avg + record_ops.py precision | **CONFIRMED** loop_reflect=66.7% (3×) |
 | mini_017 | aggregator denominator + entry_log.py truncation | **CONFIRMED** loop_reflect=66.7% (3×) |
 | mini_018 | rate_calc wrong divisor + job_ops.py truncation | Bug B redesigned; rerun needed (rep3 lost to quota) |
-| mini_019 | shrink_calc wrong divisor + stock_log.py truncation | loop_reflect=2/2 (partial, rep3 needed) |
+| mini_019 | shrink_calc wrong divisor + event_log.py truncation | Renamed Bug B file: stock_log→event_log (was too discoverable). Rerun needed. |
 | mini_020 | score_calc wrong divisor + score_entry.py truncation | loop_reflect=1/2 (partial, rep3 needed) |
 
 ---

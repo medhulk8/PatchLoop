@@ -3,7 +3,7 @@ from validator import validate_records
 from preprocessor import preprocess
 from shrink_calc import compute_shrinkage
 from categorizer import categorize_severity
-from stock_log import build_all
+from event_log import build_all
 from normalizer import normalize_output
 from reporter import build_report
 
