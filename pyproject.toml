@@ -34,3 +34,6 @@ include = ["patchloop*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+
+[tool.ruff.lint]
+# eval/analysis is included via CLI: ruff check patchloop/ tests/ eval/analysis/

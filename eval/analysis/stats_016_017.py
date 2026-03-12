@@ -13,7 +13,6 @@ Pooled (6 runs per baseline):
 
 import math
 from scipy import stats
-import numpy as np
 
 
 # ── Raw data ──────────────────────────────────────────────────────────────────

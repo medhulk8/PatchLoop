@@ -13,7 +13,6 @@ Invalid (excluded): termination_reason == ERROR
 from __future__ import annotations
 
 import argparse
-import glob
 import json
 import math
 import sys
@@ -184,7 +183,7 @@ def main() -> None:
         task_ids = all_task_ids
 
     print("=" * 68)
-    print(f"PatchLoop Statistical Analysis")
+    print("PatchLoop Statistical Analysis")
     print(f"Tasks: {', '.join(task_ids)}")
     print(f"Source: {runs_dir}/report_*.json  ({len(records)} total run records)")
     print("=" * 68)

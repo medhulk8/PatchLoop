@@ -85,7 +85,7 @@ patchloop run mini_016 --model gpt-oss-120b --baseline loop_reflect --tool-round
 patchloop bench -t mini_016 -t mini_017 -b loop -b loop_testnames -b loop_reflect \
   --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 30 --call-delay 7
 pytest eval/tasks/repos/mini_016/ -q --tb=short   # verify task fails on buggy code
-ruff check patchloop/
+ruff check patchloop/ tests/ eval/analysis/
 ```
 
 ---
