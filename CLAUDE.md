@@ -14,7 +14,7 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 ## Current Status
 
-**20 tasks built. Confirmed reflection-critical: mini_016, mini_017 (3× each); mini_020 (2/2 valid). mini_019 Bug B file renamed (stock_log→event_log — was too discoverable). mini_018 rerun needed.**
+**21 tasks built. Confirmed reflection-critical: mini_016, mini_017 (3× each); mini_020 (2/2 valid). mini_021 built (different Bug B type: wrong sign). mini_019 Bug B file renamed (stock_log→event_log). mini_018 rerun needed.**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 
@@ -39,6 +39,32 @@ Benchmark bw2c2gz90 (mini_018/019/020, valid runs only, rep3 loop_testnames/loop
 
 Pooled confirmed tasks (016/017/020 only): loop_reflect=6/7=86%, loop=1/9=11%, loop_testnames=1/7=14%.
 (Prior pooled 016+017+019+020 stats are invalidated by mini_019 not being reflection-critical.)
+
+---
+
+## Path Forward (priority order)
+
+1. **Fresh quota day: rerun mini_018 + mini_019 (fixed) + mini_020 (rep3) full 3×**
+   ```
+   patchloop bench -t mini_018 -t mini_019 -t mini_020 -b loop -b loop_testnames -b loop_reflect \
+     --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 45 --call-delay 10
+   ```
+   Goal: confirm or deny each as reflection-critical. Target: 5 confirmed tasks.
+
+2. **Fresh quota day: run mini_021 (new task, different Bug B type)**
+   ```
+   patchloop bench -t mini_021 -b loop -b loop_testnames -b loop_reflect \
+     --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 45 --call-delay 10
+   ```
+   Goal: add task diversity (wrong-sign Bug B vs int() truncation in 016-020).
+
+3. **Statistical update**: once 5+ confirmed tasks, repool and run:
+   ```
+   python eval/analysis/stats.py --tasks 016 017 018 019 020 021
+   ```
+   Report per-task outcomes as primary. Note pooled Fisher is optimistic (within-task clustering).
+
+4. **Second model validation**: Run on Groq (llama-3.3-70b-versatile, 200K TPD) — one sweep/day.
 
 ---
 
@@ -96,7 +122,12 @@ Tasks must satisfy ALL of:
 5. Issue description is **vague** — no file names, no explicit bug type
 6. 11-file pipeline repo
 
-Confirmed working: `record_ops.py` (sounds like data ops, not formatting), `entry_log.py` (sounds like audit log, not numeric coercion).
+Confirmed working: `record_ops.py` (sounds like data ops, not formatting), `entry_log.py` (sounds like audit log, not numeric coercion), `batch_ops.py` (sounds like batch processing, not fee arithmetic).
+
+Bug B type diversity (important for generalization claim):
+- mini_016: string format precision (`.2f`)
+- mini_017/018/019/020: `int()` truncation
+- **mini_021: wrong arithmetic sign (`-` instead of `+`)** ← first non-truncation Bug B type
 
 ---
 
@@ -129,6 +160,7 @@ Confirmed working: `record_ops.py` (sounds like data ops, not formatting), `entr
 | mini_018 | rate_calc wrong divisor + job_ops.py truncation | Bug B redesigned; rerun needed (rep3 lost to quota) |
 | mini_019 | shrink_calc wrong divisor + event_log.py truncation | Renamed Bug B file: stock_log→event_log (was too discoverable). Rerun needed. |
 | mini_020 | score_calc wrong divisor + score_entry.py truncation | loop_reflect=1/2 (partial, rep3 needed) |
+| mini_021 | cost_calc wrong field (weight vs qty) + batch_ops.py **wrong sign** (- instead of +) | Built, cascade verified. **Different Bug B type** — first non-truncation Bug B. Run needed. |
 
 ---
 

@@ -172,3 +172,17 @@ Full log of what was built/changed/found each session. For day-to-day working re
 - Decision: drop tool_rounds=10. 3× replication exceeds free-tier daily budget at this scale.
 - Budget sweep marked COMPLETE at 4/6/8. Story doesn't change at 10 rounds.
 - CLAUDE.md trimmed; session history moved to SESSIONS.md (this file)
+
+## Session 25 — mini_021 built, path forward documented
+- Researched LLM providers for higher quota: no free provider reaches 5M TPD. Token reduction is the real lever.
+- Addressed Codex P2 (hardcoded stats) and P3 (magic number truncation limits):
+  - P2: Created eval/analysis/stats.py that reads report_*.json directly. CLI: python eval/analysis/stats.py --tasks 016 017 020
+  - P3: Named constants _READ_FILE_MAX_LINES=200, _SEARCH_CODE_MAX_RESULTS=10 in planner.py; tool_truncations tracked per iteration and emitted in JSONL plan event
+- mini_019 discoverability issue: stock_log.py in stock pipeline was too domain-obvious. Renamed to event_log.py (rerun needed).
+- Task diversity problem identified: all Bug B instances are int() truncation (mini_017-020) or string precision (mini_016).
+- Built mini_021: order fulfillment pipeline, 11 files, cascade verified.
+  - Bug A (cost_calc.py): multiplies by weight instead of quantity → wildly wrong totals
+  - Bug B (batch_ops.py): subtracts handling_fee instead of adding it → wrong sign
+  - Cascade: both bugs → 1/5 pass | fix Bug A only → 4/5 pass (test_04 fails) | fix both → 5/5 pass
+  - **First task with non-truncation Bug B type** — wrong arithmetic operator
+- Path forward documented in CLAUDE.md: rerun 018/019/020 → run 021 → pool stats → second model validation

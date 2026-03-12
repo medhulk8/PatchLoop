@@ -1,0 +1,22 @@
+task_id: mini_021
+repo: repos/mini_021
+issue: |
+  The order fulfillment pipeline is reporting incorrect final prices for most
+  items. The pipeline processes order items through validation, cost computation,
+  and output assembly. For some inputs the prices are far off; for others they
+  appear reasonable.
+
+  The deviation varies across different item configurations, which suggests the
+  computation is using the wrong reference value. The output structure and item
+  ID assignments look correct. The issue is in how the order cost is computed,
+  not in data loading or reporting.
+test_cmd: pytest test_regression.py -v
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - wrong-file-trap
+  - reflection-critical
+  - generic-test-names
+  - wrong-sign
