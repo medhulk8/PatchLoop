@@ -90,7 +90,7 @@ class BenchmarkRunner:
         """
         Run the benchmark.
 
-        baselines: which baselines to evaluate. Defaults to all three.
+        baselines: which baselines to evaluate. Defaults to all four.
         task_ids: subset of tasks to run. None = all tasks.
 
         If num_runs > 1, each (task, baseline) pair is run num_runs times

@@ -6,8 +6,10 @@ Usage:
     python eval/analysis/stats.py --tasks 016 017 020      # specific tasks
     python eval/analysis/stats.py --runs-dir path/to/runs  # custom runs dir
 
-Valid runs: termination_reason in {SUCCESS, STUCK, TIME_LIMIT}
-Invalid (excluded): termination_reason == ERROR
+Valid runs: all termination_reason values except ERROR
+Invalid (excluded): termination_reason == ERROR (infrastructure failure — quota, API crash)
+
+NO_DIFF and MAX_ITERATIONS are agent failures and count in the denominator.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from pathlib import Path
 from scipy import stats as scipy_stats
 
 BASELINES = ["loop", "loop_testnames", "loop_reflect"]
-VALID_TERMINATIONS = {"SUCCESS", "STUCK", "TIME_LIMIT"}
+INVALID_TERMINATIONS = {"ERROR"}
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
@@ -48,7 +50,7 @@ def compute_kn(
         r for r in records
         if r["task_id"] in task_ids
         and r["baseline"] == baseline
-        and r["termination_reason"] in VALID_TERMINATIONS
+        and r["termination_reason"] not in INVALID_TERMINATIONS
     ]
     k = sum(1 for r in relevant if r["resolved"])
     return k, len(relevant)

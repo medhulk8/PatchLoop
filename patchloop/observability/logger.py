@@ -140,7 +140,7 @@ class RunLogger:
             "resolved": state.resolved,
             "termination_reason": state.termination_reason.value
             if state.termination_reason else None,
-            "iterations_used": state.iteration,
+            "iterations_used": len(state.iterations),
             "elapsed_s": state.elapsed_s,
             "total_llm_calls": sum(r.llm_calls for r in state.iterations),
             "total_tokens": sum(r.total_tokens for r in state.iterations),

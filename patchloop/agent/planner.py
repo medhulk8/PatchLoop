@@ -32,7 +32,7 @@ Rules:
 
 def _extract_failed_tests(state: LoopState) -> str:
     """
-    Extract FAILED test lines from the last iteration's stdout.
+    Extract FAILED test lines from the last iteration's stdout and stderr.
 
     Returns a formatted string ready to append to a prompt section,
     or empty string if there are no failed lines to report.
