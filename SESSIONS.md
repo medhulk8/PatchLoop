@@ -128,6 +128,18 @@ Full log of what was built/changed/found each session. For day-to-day working re
 - tool_rounds=10 attempted immediately after — stopped by quota after loop rep 1 (data invalid)
 - Report: runs/report_1773075316.json
 
+## Session 24 — LLM provider research + token reduction improvements
+- Researched alternative LLM providers for benchmark runs (Groq, SambaNova, Together, Fireworks, OpenRouter)
+- Conclusion: no free provider has >200K TPD at 70B-class; Cerebras (~1M TPD) remains the best free option
+- Groq free tier: 200K TPD for gpt-oss-120b, 100K for llama-3.3-70b (worse than Cerebras, not overflow)
+- SambaNova free tier: 20 RPD / 200K TPD (also not better; use for second-model validation only)
+- Implemented defensive token reduction in planner.py tool_handler:
+  - read_file: truncated at 200 lines (was unlimited)
+  - search_code: capped at 10 results (was unlimited)
+  - Reflector was already capping stdout/stderr at 1500 chars each
+- Updated CLAUDE.md LLM providers table with verified free-tier TPD limits
+- Ran second benchmark attempt (bw2c2gz90) on mini_018/019/020 — heavy queue_exceeded traffic, results pending
+
 ## Session 23 — Benchmark on 018/019/020, statistical significance, mini_018 Bug B redesign
 - Ran 3-baseline bench on mini_018/019/020 (tool_rounds=6, 3 reps). Rep3 lost to token quota.
 - Valid results: mini_019 loop_reflect=2/2; mini_020 loop_reflect=1/2; mini_018 loop_reflect=0/2

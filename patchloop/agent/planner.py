@@ -137,7 +137,12 @@ class Planner:
         def tool_handler(name: str, inputs: dict[str, Any]) -> str:
             try:
                 if name == "read_file":
-                    return env.read_file(inputs["path"])
+                    content = env.read_file(inputs["path"])
+                    lines = content.splitlines()
+                    if len(lines) > 200:
+                        truncated = "\n".join(lines[:200])
+                        return truncated + f"\n\n[...truncated: {len(lines) - 200} more lines not shown]"
+                    return content
                 elif name == "list_files":
                     files = env.list_files(inputs.get("pattern", "**/*.py"))
                     return "\n".join(files) if files else "(no files found)"
@@ -145,10 +150,14 @@ class Planner:
                     results = env.search_code(inputs["query"])
                     if not results:
                         return "(no matches)"
-                    return "\n".join(
+                    capped = results[:10]
+                    output = "\n".join(
                         f"{r['file']}:{r['line']}: {r['text']}"
-                        for r in results
+                        for r in capped
                     )
+                    if len(results) > 10:
+                        output += f"\n[...{len(results) - 10} more results not shown]"
+                    return output
                 else:
                     return f"Unknown tool: {name}"
             except FileNotFoundError as e:

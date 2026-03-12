@@ -133,8 +133,16 @@ Confirmed working: `record_ops.py` (sounds like data ops, not formatting), `entr
 
 ## LLM Providers
 
-| Provider | Key var | Model | Notes |
-|---|---|---|---|
-| Cerebras (recommended) | `CEREBRAS_API_KEY` (in ~/.zshenv) | `gpt-oss-120b` | 14,400 RPD + daily token budget |
-| Groq | `LLM_API_KEY` + `LLM_BASE_URL=https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | 14,400 RPD |
-| Gemini | `GEMINI_API_KEY` | `gemini-2.5-flash` | ~50 RPD (too low for bench) |
+| Provider | Key var | Model | TPD (free) | Notes |
+|---|---|---|---|---|
+| **Cerebras (primary)** | `CEREBRAS_API_KEY` (in ~/.zshenv) | `gpt-oss-120b` | ~1M | Best free option. 14,400 RPD. Daily token budget (~1M/day estimated from use). |
+| Groq | `LLM_API_KEY` + `LLM_BASE_URL=https://api.groq.com/openai/v1` | `gpt-oss-120b` or `llama-3.3-70b-versatile` | 200K / 100K | Free tier TPD confirmed lower than Cerebras. Use for second-model validation only. |
+| SambaNova | `LLM_API_KEY` + `LLM_BASE_URL=https://api.sambanova.ai/v1` | `Meta-Llama-3.3-70B-Instruct` | 200K | 20 RPD / 200K TPD. Not better than Cerebras. Second-model validation only. |
+| Gemini | `GEMINI_API_KEY` | `gemini-2.5-flash` | — | ~50 RPD (too low for bench) |
+
+**Token reduction (implemented in planner.py):**
+- `read_file` truncated at 200 lines — minimal impact on small task repos, good hygiene
+- `search_code` capped at 10 results — reduces tool result size
+- Reflector already caps diff at 2000 chars, stdout/stderr at 1500 chars each
+
+**No free provider solves the quota problem.** The real lever is token reduction per run or splitting sweeps across days.
