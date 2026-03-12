@@ -77,6 +77,7 @@ class IterationRecord(BaseModel):
     # PLAN phase
     plan: str | None = None
     proposed_diff: str | None = None
+    tool_truncations: dict[str, int] = Field(default_factory=dict)
 
     # APPLY_PATCH phase
     patch_applied: bool | None = None

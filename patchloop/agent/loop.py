@@ -123,7 +123,11 @@ class AgentLoop:
         self.logger.log_phase(state.iteration, AgentPhase.PLAN)
 
         self.planner.run(state, self.env, self.task, record)
-        self.logger.log_plan(state.iteration, record.plan or "")
+        self.logger.log_plan(
+            state.iteration,
+            record.plan or "",
+            tool_truncations=record.tool_truncations or None,
+        )
 
         if record.proposed_diff:
             self.logger.log_patch_proposed(state.iteration, record.proposed_diff)

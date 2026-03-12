@@ -68,12 +68,20 @@ class RunLogger:
             "phase": str(phase.value) if hasattr(phase, "value") else str(phase),
         })
 
-    def log_plan(self, iteration: int, plan: str) -> None:
-        self._write("plan", {
+    def log_plan(
+        self,
+        iteration: int,
+        plan: str,
+        tool_truncations: dict[str, int] | None = None,
+    ) -> None:
+        payload: dict[str, Any] = {
             "iteration": iteration,
             "plan_length": len(plan),
             "plan_preview": plan[:500],    # first 500 chars for quick inspection
-        })
+        }
+        if tool_truncations:
+            payload["tool_truncations"] = tool_truncations
+        self._write("plan", payload)
 
     def log_patch_proposed(self, iteration: int, diff: str) -> None:
         self._write("patch_proposed", {

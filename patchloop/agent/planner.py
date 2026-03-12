@@ -8,6 +8,11 @@ from patchloop.environment.base import Environment
 from patchloop.environment.task import Task
 from patchloop.llm.client import CODING_TOOLS, LLMClient
 
+# Tool output limits — deliberate budget controls, not arbitrary.
+# Raising these increases token spend per iteration; lowering may hide context.
+_READ_FILE_MAX_LINES = 200
+_SEARCH_CODE_MAX_RESULTS = 10
+
 _SYSTEM_PROMPT = """\
 You are an expert software engineer fixing a bug in a Python codebase.
 
@@ -134,14 +139,17 @@ class Planner:
         - record.plan contains the full LLM response (plan + reasoning)
         - record.proposed_diff contains the extracted unified diff (or None)
         """
+        truncations: dict[str, int] = {"read_file": 0, "search_code": 0}
+
         def tool_handler(name: str, inputs: dict[str, Any]) -> str:
             try:
                 if name == "read_file":
                     content = env.read_file(inputs["path"])
                     lines = content.splitlines()
-                    if len(lines) > 200:
-                        truncated = "\n".join(lines[:200])
-                        return truncated + f"\n\n[...truncated: {len(lines) - 200} more lines not shown]"
+                    if len(lines) > _READ_FILE_MAX_LINES:
+                        truncations["read_file"] += 1
+                        truncated = "\n".join(lines[:_READ_FILE_MAX_LINES])
+                        return truncated + f"\n\n[...truncated: {len(lines) - _READ_FILE_MAX_LINES} more lines not shown]"
                     return content
                 elif name == "list_files":
                     files = env.list_files(inputs.get("pattern", "**/*.py"))
@@ -150,13 +158,14 @@ class Planner:
                     results = env.search_code(inputs["query"])
                     if not results:
                         return "(no matches)"
-                    capped = results[:10]
+                    capped = results[:_SEARCH_CODE_MAX_RESULTS]
                     output = "\n".join(
                         f"{r['file']}:{r['line']}: {r['text']}"
                         for r in capped
                     )
-                    if len(results) > 10:
-                        output += f"\n[...{len(results) - 10} more results not shown]"
+                    if len(results) > _SEARCH_CODE_MAX_RESULTS:
+                        truncations["search_code"] += 1
+                        output += f"\n[...{len(results) - _SEARCH_CODE_MAX_RESULTS} more results not shown]"
                     return output
                 else:
                     return f"Unknown tool: {name}"
@@ -178,3 +187,4 @@ class Planner:
 
         record.plan = response_text
         record.proposed_diff = extract_diff(response_text)
+        record.tool_truncations = truncations
