@@ -4,6 +4,7 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,7 +50,8 @@ class Reflection(BaseModel):
     - what_failed: describes the observed failure in one sentence
     - root_cause_hypothesis: the agent's best guess at why it happened
     - patch_summary: what the attempted patch did
-    - lesson: actionable instruction for the next attempt — this is what
+    - patch_assessment: whether patch was wrong, partially correct, or unclear
+    - lesson: actionable search direction for the next attempt — this is what
               gets injected into the PLAN prompt for future iterations
     - error_signature: MD5 of the test output, used for anti-repeat detection
     """
@@ -58,6 +60,7 @@ class Reflection(BaseModel):
     what_failed: str
     root_cause_hypothesis: str
     patch_summary: str
+    patch_assessment: Literal["likely_wrong", "likely_partial_success", "unclear"] = "unclear"
     lesson: str
     error_signature: str
 

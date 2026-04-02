@@ -10,5 +10,4 @@ def compute_normalized(record: StudentRecord) -> float:
     The max_score is the correct denominator — it represents the ceiling
     against which the student's performance is measured.
     """
-    # BUG: divides by attempts instead of max_score
     return (record.raw_score / record.attempts) * 100

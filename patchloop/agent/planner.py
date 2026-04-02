@@ -67,12 +67,23 @@ def build_user_message(task: Task, state: LoopState) -> str:
 
     if state.reflections and state.baseline == "loop_reflect":
         lessons = "\n".join(
-            f"- **Iteration {r.iteration}**: {r.lesson}"
+            f"- **Iteration {r.iteration}** [{r.patch_assessment}]: {r.lesson}"
             for r in state.reflections
         )
+        # If the most recent patch was a partial success, make that explicit
+        # so the model doesn't revert a correct fix
+        last = state.reflections[-1]
+        if last.patch_assessment == "likely_partial_success":
+            preamble = (
+                "Your previous patch appears to have PARTIALLY fixed the issue "
+                "(more tests pass now than before). Do NOT revert it. "
+                "There is likely a second bug elsewhere. Search for it.\n\n"
+            )
+        else:
+            preamble = "Do NOT repeat these mistakes:\n\n"
         parts.append(
             "## Lessons from previous failed attempts\n\n"
-            "Do NOT repeat these mistakes:\n\n" + lessons + _extract_failed_tests(state)
+            + preamble + lessons + _extract_failed_tests(state)
         )
     elif state.iterations and state.baseline == "loop_testnames":
         failed_tests = _extract_failed_tests(state)

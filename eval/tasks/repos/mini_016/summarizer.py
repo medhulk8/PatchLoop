@@ -17,7 +17,7 @@ def summarize_bucket(records: list[Record]) -> dict:
 
     # Compute the representative value for this bucket.
     # Each record's contribution is proportional to its weight.
-    representative = total_amount / record_count  # BUG: divides by count, not total_weight
+    representative = total_amount / record_count
 
     return {
         "count": record_count,

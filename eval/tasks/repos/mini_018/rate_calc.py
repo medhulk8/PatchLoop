@@ -9,5 +9,4 @@ def compute_rate(job: WorkerJob) -> float:
     Elapsed time in hours is the correct normalisation denominator for
     a per-hour throughput metric.
     """
-    # BUG: divides by num_workers instead of elapsed_hours
     return job.completed_jobs / job.num_workers

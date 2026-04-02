@@ -8,7 +8,7 @@ def persist_stats(stats: dict) -> dict:
     return {
         "total_requests": stats["total_requests"],
         "total_window": stats["total_window"],
-        "error_count": int(stats["total_errors"]),  # BUG: truncates float error counts
+        "error_count": int(stats["total_errors"]),
         "error_rate": stats["error_rate"],
     }
 

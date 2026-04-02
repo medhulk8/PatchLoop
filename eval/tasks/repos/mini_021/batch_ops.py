@@ -5,7 +5,6 @@ def build_record(item_id: str, cost: float, handling_fee: float) -> dict:
     The final price is the item cost plus the handling fee.
     Both values contribute to the total charged to the customer.
     """
-    # BUG: subtracts handling_fee instead of adding it
     return {
         "item_id": item_id,
         "final_price": round(cost - handling_fee),

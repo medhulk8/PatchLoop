@@ -283,5 +283,26 @@ class LLMClient:
         # Exhausted tool rounds — the last response was a tool_calls message
         # (content is empty). Force one final text-only call so the model can
         # commit to a diff based on everything it has read so far.
-        response = self._call(messages=full_messages, tools=None, record=record)
-        return response.choices[0].message.content or ""
+        full_messages.append({
+            "role": "user",
+            "content": (
+                "You have used all available tool calls. "
+                "Based on everything you have read so far, produce the unified diff that fixes the bug. "
+                "Output it inside a ```diff ... ``` code block. "
+                "If you cannot determine a fix, say so clearly."
+            ),
+        })
+        try:
+            response = self._call(messages=full_messages, tools=None, record=record)
+            return response.choices[0].message.content or ""
+        except BadRequestError as e:
+            if "tool_use_failed" not in str(e):
+                raise
+            body = getattr(e, "body", None)
+            if isinstance(body, dict):
+                if body.get("failed_generation"):
+                    return body["failed_generation"]
+                err = body.get("error", {})
+                if isinstance(err, dict) and err.get("failed_generation"):
+                    return err["failed_generation"]
+            raise

@@ -16,7 +16,7 @@ def aggregate_service(entries: list[LogEntry]) -> dict:
     total_window = sum(e.window_seconds for e in entries)
 
     # Compute the error rate across all requests for this service.
-    error_rate = total_errors / len(entries)  # BUG: divides by entry count, not total_requests
+    error_rate = total_errors / len(entries)
 
     return {
         "total_requests": total_requests,

@@ -10,5 +10,4 @@ def compute_cost(item: OrderItem) -> float:
     The quantity is the correct multiplier — it represents the
     number of units ordered by the customer.
     """
-    # BUG: multiplies by weight instead of quantity
     return item.unit_price * item.weight

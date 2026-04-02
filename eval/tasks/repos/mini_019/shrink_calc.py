@@ -12,5 +12,4 @@ def compute_shrinkage(item: StockItem) -> float:
     the baseline from which loss is measured.
     """
     lost = item.opening_stock - item.closing_stock
-    # BUG: divides by closing_stock instead of opening_stock
     return lost / item.closing_stock

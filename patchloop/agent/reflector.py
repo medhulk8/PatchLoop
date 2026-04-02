@@ -10,17 +10,31 @@ _SYSTEM_PROMPT = """\
 You are analyzing a failed software patch attempt. Your job is to produce a structured
 reflection that will help the next patch attempt avoid repeating the same mistake.
 
-Be concise and specific. Focus on actionable insights, not generic advice.
+Critical rules:
+- If the patch caused MORE tests to pass than before, treat it as LIKELY CORRECT BUT INCOMPLETE.
+  Do NOT recommend reverting it unless you have direct evidence it caused a regression.
+- A patch that improved test outcomes probably fixed one bug. The remaining failures
+  likely indicate a SECOND bug elsewhere in the codebase.
+- Frame the lesson as a SEARCH DIRECTION (where to look next), not a root-cause verdict.
+- Be concise and specific. Focus on actionable guidance, not generic advice.
 """
 
 _USER_TEMPLATE = """\
+## Test results before this patch
+
+Tests passing before patch: {prev_passed}
+Tests failing before patch: {prev_failed}
+
 ## Attempted patch
 
 ```diff
 {diff}
 ```
 
-## Test failure output
+## Test results after this patch
+
+Tests passing after patch: {curr_passed}
+Tests failing after patch: {curr_failed}
 
 **stdout:**
 ```
@@ -39,15 +53,44 @@ Analyze the failure and respond with a JSON object matching this exact schema:
 ```json
 {{
   "error_type": "<short category: assertion_error | import_error | type_error | syntax_error | name_error | attribute_error | runtime_error | logic_error | other>",
-  "what_failed": "<one sentence: what went wrong>",
-  "root_cause_hypothesis": "<one or two sentences: why it likely failed>",
+  "what_failed": "<one sentence: what is still failing after the patch>",
+  "root_cause_hypothesis": "<one or two sentences: why the remaining failure likely occurs>",
   "patch_summary": "<one sentence: what the patch attempted to do>",
-  "lesson": "<one or two sentences: specific instruction for the next attempt to avoid this failure>"
+  "patch_assessment": "<one of: likely_wrong | likely_partial_success | unclear>",
+  "lesson": "<one or two sentences: WHERE TO LOOK NEXT — a search direction, not a root-cause verdict. If tests improved, do not suggest reverting the patch.>"
 }}
 ```
 
+Rules for patch_assessment:
+- Use "likely_partial_success" if more tests pass now than before.
+- Use "likely_wrong" only if the patch caused a regression (fewer tests pass now) or no change at all AND there is direct evidence the patch is wrong.
+- Use "unclear" otherwise.
+
 Respond with ONLY the JSON object. No markdown fences, no extra text.
 """
+
+
+def _count_tests(stdout: str) -> tuple[int, int]:
+    """
+    Parse pytest stdout to count passed and failed tests.
+    Returns (passed, failed).
+    """
+    # Match lines like "4 passed, 1 failed" or "5 failed" or "5 passed"
+    summary = re.search(
+        r"(\d+) passed.*?(\d+) failed|(\d+) failed|(\d+) passed",
+        stdout,
+        re.IGNORECASE,
+    )
+    if not summary:
+        return 0, 0
+    groups = summary.groups()
+    if groups[0] is not None and groups[1] is not None:
+        return int(groups[0]), int(groups[1])
+    if groups[2] is not None:
+        return 0, int(groups[2])
+    if groups[3] is not None:
+        return int(groups[3]), 0
+    return 0, 0
 
 
 def _parse_reflection_json(text: str, iteration: int, sig: str) -> Reflection:
@@ -61,12 +104,12 @@ def _parse_reflection_json(text: str, iteration: int, sig: str) -> Reflection:
     try:
         data = json.loads(text)
     except json.JSONDecodeError:
-        # Best-effort: extract any recognizable content
         data = {
             "error_type": "unknown",
             "what_failed": text[:200],
             "root_cause_hypothesis": "Could not parse reflection.",
             "patch_summary": "Unknown",
+            "patch_assessment": "unclear",
             "lesson": "Re-read the failing test before proposing a patch.",
         }
 
@@ -76,6 +119,7 @@ def _parse_reflection_json(text: str, iteration: int, sig: str) -> Reflection:
         what_failed=data.get("what_failed", ""),
         root_cause_hypothesis=data.get("root_cause_hypothesis", ""),
         patch_summary=data.get("patch_summary", ""),
+        patch_assessment=data.get("patch_assessment", "unclear"),
         lesson=data.get("lesson", ""),
         error_signature=sig,
     )
@@ -105,8 +149,24 @@ class Reflector:
             record.test_result.stderr, record.test_result.stdout
         )
 
+        # Compute test delta: how many tests passed before vs after this patch
+        prev_record = state.iterations[-2] if len(state.iterations) >= 2 else None
+        if prev_record and prev_record.test_result:
+            prev_combined = (prev_record.test_result.stdout or "") + "\n" + (prev_record.test_result.stderr or "")
+            prev_passed, prev_failed = _count_tests(prev_combined)
+        else:
+            # Iteration 0 — no prior test result, assume all failed
+            prev_passed, prev_failed = 0, "unknown"
+
+        curr_combined = (record.test_result.stdout or "") + "\n" + (record.test_result.stderr or "")
+        curr_passed, curr_failed = _count_tests(curr_combined)
+
         user_message = _USER_TEMPLATE.format(
-            diff=diff[:2000],               # cap diff size
+            prev_passed=prev_passed,
+            prev_failed=prev_failed,
+            diff=diff[:2000],
+            curr_passed=curr_passed,
+            curr_failed=curr_failed,
             stdout=record.test_result.stdout[-1500:],
             stderr=record.test_result.stderr[-1500:],
         )
