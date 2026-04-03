@@ -70,27 +70,26 @@ Respond with ONLY the JSON object. No markdown fences, no extra text.
 """
 
 
-def _count_tests(stdout: str) -> tuple[int, int]:
+def _count_tests(output: str) -> tuple[int, int]:
     """
-    Parse pytest stdout to count passed and failed tests.
-    Returns (passed, failed).
+    Parse pytest output to count passed and not-passed tests.
+    Returns (passed, not_passed) where not_passed includes failed + error + xfailed.
+
+    Parses all "N <status>" tokens from the pytest summary line, e.g.:
+      "4 passed, 1 failed, 2 error in 0.5s"
+      "5 failed in 0.3s"
+      "3 passed in 0.1s"
     """
-    # Match lines like "4 passed, 1 failed" or "5 failed" or "5 passed"
-    summary = re.search(
-        r"(\d+) passed.*?(\d+) failed|(\d+) failed|(\d+) passed",
-        stdout,
-        re.IGNORECASE,
-    )
-    if not summary:
-        return 0, 0
-    groups = summary.groups()
-    if groups[0] is not None and groups[1] is not None:
-        return int(groups[0]), int(groups[1])
-    if groups[2] is not None:
-        return 0, int(groups[2])
-    if groups[3] is not None:
-        return int(groups[3]), 0
-    return 0, 0
+    passed = 0
+    not_passed = 0
+    for m in re.finditer(r"(\d+)\s+(passed|failed|error|errors|xfailed|xpassed)", output, re.IGNORECASE):
+        count = int(m.group(1))
+        status = m.group(2).lower()
+        if status == "passed":
+            passed += count
+        else:
+            not_passed += count
+    return passed, not_passed
 
 
 def _parse_reflection_json(text: str, iteration: int, sig: str) -> Reflection:

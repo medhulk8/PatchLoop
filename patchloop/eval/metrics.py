@@ -22,8 +22,10 @@ def compute_metrics(results: list[TaskResult]) -> dict[str, Any]:
     for r in results:
         by_baseline[r.baseline].append(r)
 
+    unique_tasks = len({r.task_id for r in results})
     summary: dict[str, Any] = {
-        "total_tasks": len(results),
+        "total_runs": len(results),
+        "total_tasks": unique_tasks,
         "baselines": {},
     }
 
@@ -89,7 +91,7 @@ def format_summary_table(summary: dict[str, Any]) -> str:
     if not summary:
         return "No results."
 
-    baseline_order = ["single_shot", "loop", "loop_reflect"]
+    baseline_order = ["single_shot", "loop", "loop_testnames", "loop_reflect"]
     available = [b for b in baseline_order if b in summary.get("baselines", {})]
     # Append any baselines not in the standard order
     available += [
