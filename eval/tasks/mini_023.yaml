@@ -2,12 +2,14 @@ task_id: mini_023
 repo: repos/mini_023
 issue: |
   The risk scoring pipeline is returning risk scores greater than 1.0 for
-  most customers, which is invalid — scores should be a proportion between
-  0.0 and 1.0. Event loading and routing complete without errors.
+  most customers, which is invalid — the risk score should be flagged
+  transaction value divided by total transaction value, a proportion between
+  0.0 and 1.0.
 
-  The output structure is correct, but the final risk score values are
-  systematically wrong in a way that suggests the score formula is using
-  its inputs incorrectly.
+  Event loading, routing, and aggregation all appear to produce correct
+  intermediate values. The error is in the final risk score computation
+  itself — the formula appears to have its inputs in the wrong order,
+  producing the reciprocal of the correct score.
 test_cmd: pytest test_regression.py -v
 time_limit_s: 360
 max_iterations: 5

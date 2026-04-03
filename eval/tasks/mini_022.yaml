@@ -1,13 +1,14 @@
 task_id: mini_022
 repo: repos/mini_022
 issue: |
-  The refund analytics pipeline is producing refund rates above 1.0 for
-  processed orders, which is mathematically impossible for a proportional
-  rate. The rate should always be a value between 0.0 and 1.0.
+  The refund analytics pipeline is producing refund rates well above 1.0,
+  which is impossible — refund rate should be total refunded value divided
+  by total order value, always yielding a proportion between 0.0 and 1.0.
 
-  Records load and validate correctly, and the output structure looks intact.
-  The problem appears to be in how the final rate is computed from the
-  aggregated totals.
+  The aggregated totals (total refunded, total order value) appear correct
+  when inspected individually. The error is isolated to the final step that
+  converts those two totals into a proportional rate — the formula appears
+  to have the numerator and denominator swapped.
 test_cmd: pytest test_regression.py -v
 time_limit_s: 360
 max_iterations: 5
