@@ -173,6 +173,47 @@ Full log of what was built/changed/found each session. For day-to-day working re
 - Budget sweep marked COMPLETE at 4/6/8. Story doesn't change at 10 rounds.
 - CLAUDE.md trimmed; session history moved to SESSIONS.md (this file)
 
+## Session 27 — Multi-hop Bug B design + first p<0.05 result on clean data
+
+### Key insight: multi-hop Bug B is the missing ingredient
+Prior tasks (mini_016–021) used generic file naming as the only Bug B hiding mechanism. After removing # BUG: comments, all baselines solved equally (or all failed) — no reflection signal. The fix: Bug B must require tracing a 2-3 file call chain, not just opening a generically-named file.
+
+### New task family (arithmetic expansion Bug B)
+Built 3 new tasks. mini_022 and mini_024 confirmed reflection-critical. mini_023 noisy (boolean classification Bug B too shallow).
+
+**Design pattern:**
+- Bug A: inverted division in `rate_calc.py` or `score_calc.py` — findable in 1-2 reads from issue description
+- Bug B: `record_ops.expand_*_rows` copies full amount per expanded row instead of dividing by item count — requires tracing summary_builder → pipeline → record_ops to localize
+- Issue description explicitly states "aggregated totals look correct, error is in final proportional step" — pulls model to calc file, away from summary/pipeline
+
+**Why it works:** opening record_ops.py is not enough — model must understand row expansion semantics (one order → N rows, amount should be split). Reflection provides the specific lesson "keep Bug A fix, look earlier in data path."
+
+### Benchmark results (tool_rounds=8, gpt-oss-120b via Fireworks)
+
+| Task | loop | loop_testnames | loop_reflect |
+|---|---|---|---|
+| mini_022 (refund-rate) | 1/16 = 6% | 1/7 = 14% | **4/9 = 44%** |
+| mini_023 (risk-score) | 1/11 = 9% | 1/5 = 20% | 1/6 = 17% |
+| mini_024 (chargeback-rate) | 0/4 = 0% | 0/3 = 0% | **2/5 = 40%** |
+| **Pooled** | **2/31 = 6.5%** | **2/15 = 13.3%** | **7/20 = 35.0%** |
+
+Fisher's exact (loop_reflect vs loop): **p=0.0132** — first statistically significant result on clean data.
+Fisher's exact (loop_reflect vs loop_testnames): p=0.144 — not yet significant.
+
+### Calibration journey this session
+- mini_019 at tool_rounds=8: 0/7 all baselines — confirmed not stable, dropped
+- Triage pass (loop-only, tool_rounds=12) on mini_016–021: identified mini_022/024 design gap
+- mini_023 signal pass: loop_testnames sometimes beats loop_reflect — boolean Bug B identified as weak type
+- mini_024 replicates mini_022 pattern (chargeback domain, same arithmetic expansion structure)
+
+### What's confirmed
+- **Main claim:** loop_reflect significantly outperforms blind retry on arithmetic-expansion cascade bugs (p=0.0132)
+- **Mechanism:** logs show model fixes Bug A, stalls on Bug B, reflection lesson redirects to record_ops
+- **Negative design lesson:** boolean classification Bug B (mini_023) is too shallow — model sometimes finds it by luck
+- **loop_testnames separation:** directional but not statistically confirmed — mechanism claim supported by logs not stats alone
+
+### Next: more reps on mini_024 to solidify the task family story
+
 ## Session 26 — Full 54-run sweep + # BUG: comment confound discovery + reflector rewrite
 
 ### Provider journey
