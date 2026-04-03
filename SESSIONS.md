@@ -173,6 +173,61 @@ Full log of what was built/changed/found each session. For day-to-day working re
 - Budget sweep marked COMPLETE at 4/6/8. Story doesn't change at 10 rounds.
 - CLAUDE.md trimmed; session history moved to SESSIONS.md (this file)
 
+## Session 26 — Full 54-run sweep + # BUG: comment confound discovery + reflector rewrite
+
+### Provider journey
+- Cerebras congested (queue_exceeded) → switched to Fireworks AI ($6 free credits, gpt-oss-120b)
+- Groq llama-3.3-70b tool use broken: outputs raw text instead of API tool-call format → ruled out
+- Groq gpt-oss-120b: only 200K TPD, exhausted after 4 runs → too low for full sweep
+- Fireworks gpt-oss-120b: empty plan on tool exhaustion fallback → fixed by adding explicit "commit your diff now" message. Also parallel_tool_calls error — tried parallel_tool_calls=False (reverted, broke tool use). Real fix: tool_rounds=10 so model finishes naturally before exhaustion.
+- API key in ~/.zshenv: LLM_API_KEY=fw_MZL4v9pJpEmmLVZh3qdXB7, LLM_BASE_URL=https://api.fireworks.ai/inference/v1
+
+### Critical confound discovered: # BUG: inline comments
+- Every reflection-critical task had inline comments like `# BUG: divides by count, not total_weight`
+- Model read these comments during exploration and immediately knew exact bug location and type
+- This invalidates ALL prior confirmed results (mini_016=66.7%, mini_017=66.7%, mini_020=2/2)
+- Removed # BUG: comments from all 6 tasks (mini_016–021) across all buggy files
+
+### Reflector rewrite (based on ChatGPT analysis)
+- **patch_assessment** field added to Reflection (likely_wrong | likely_partial_success | unclear)
+  - likely_partial_success: more tests pass after patch than before — do NOT revert
+  - likely_wrong: patch caused regression or no change with direct evidence
+- **Test delta**: before/after pass counts (prev_passed, prev_failed, curr_passed, curr_failed) injected into reflector prompt
+- **Non-reversion bias**: system prompt instructs reflector not to suggest reverting a patch that improved test outcomes
+- **Lesson modulation** in planner.py: if patch_assessment==likely_partial_success, preamble says "do NOT revert — look for second bug"; otherwise standard "do not repeat mistakes"
+- Parse combined stdout+stderr for test counts (previously only stderr)
+- state.py: patch_assessment typed as Literal[...] instead of str
+
+### Codex P2/P3 audit fixes (implemented same session)
+- P2: Created eval/analysis/stats.py — reads report_*.json directly, no hardcoded counts
+- P3: Named constants _READ_FILE_MAX_LINES=200, _SEARCH_CODE_MAX_RESULTS=10 in planner.py; tool_truncations tracked and emitted in JSONL
+
+### Full 54-run sweep results (report_1775208132.json)
+- 6 tasks × 3 baselines × 3 reps, model: accounts/fireworks/models/gpt-oss-120b
+- **No # BUG: comments** (first fully clean sweep)
+
+| baseline | resolved | resolve_rate | avg_iters_success | repeat_failure_rate |
+|---|---|---|---|---|
+| loop | 2/18 | 11.1% | 1.50 | 17.6% |
+| loop_testnames | 3/18 | 16.7% | 1.33 | 3.7% |
+| loop_reflect | 3/18 | 16.7% | 2.67 | 18.9% |
+
+Per-task breakdown (loop_reflect):
+- mini_016: 1/3 (was 2/3 with BUG comments — signal mostly gone)
+- mini_017: 0/3 (was 2/3 — BUG comments were primary driver)
+- mini_018: 0/3 (never confirmed, rerun still needed)
+- mini_019: **2/3** (loop=0/3, loop_testnames=1/3 — still shows signal after event_log rename)
+- mini_020: 0/3 (was 2/2 — BUG comments were primary driver)
+- mini_021: 1/3 (first run, no prior baseline)
+
+### Key findings
+- The # BUG: comment confound was the primary driver of prior "confirmations" for 016/017/020
+- Without BUG hints, tasks are now too hard: overall solve rate 11-17% across all baselines
+- loop_reflect avg iters to success = 2.67 vs 1.50/1.33 — reflector IS extending search, but success rate not significantly different
+- mini_019 (event_log.py) is the only task showing residual reflection-critical signal
+- loop_testnames = loop_reflect = 16.7% on cleaned tasks — test-name grounding as helpful as reflection here
+- Tasks need recalibration: either increase tool budget or redesign cascade difficulty
+
 ## Session 25 — mini_021 built, path forward documented
 - Researched LLM providers for higher quota: no free provider reaches 5M TPD. Token reduction is the real lever.
 - Addressed Codex P2 (hardcoded stats) and P3 (magic number truncation limits):

@@ -14,57 +14,44 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 ## Current Status
 
-**21 tasks built. Confirmed reflection-critical: mini_016, mini_017 (3× each); mini_020 (2/2 valid). mini_021 built (different Bug B type: wrong sign). mini_019 Bug B file renamed (stock_log→event_log). mini_018 rerun needed.**
+**⚠ CONFOUND DISCOVERED + RESOLVED**: All reflection-critical tasks (mini_016–021) had `# BUG:` inline comments that leaked bug location and type to the model. Prior "confirmed" results (016=66.7%, 017=66.7%, 020=2/2) are invalidated — the model was reading the hints, not reasoning from reflection. Comments removed in Session 26.
+
+**21 tasks built. Cleaned first sweep complete (report_1775208132.json). No task confirmed reflection-critical on cleaned data yet. Recalibration needed.**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 
-Budget sweep results (mini_016 + mini_017, 3 baselines, 3 reps):
+**First clean 54-run sweep** (6 tasks × 3 baselines × 3 reps, gpt-oss-120b via Fireworks, # BUG: comments removed):
 
-| tool_rounds | loop | loop_testnames | loop_reflect |
-|---|---|---|---|
-| 4 | 0% | 0% | 0% |
-| 6 | 33.3% | 33.3% | **66.7%** |
-| 8 | 50.0% | 33.3% | **66.7%** |
-| 10 | dropped — free-tier daily token budget insufficient for 3× |
+| baseline | resolved | resolve_rate |
+|---|---|---|
+| loop | 2/18 | 11.1% |
+| loop_testnames | 3/18 | 16.7% |
+| loop_reflect | 3/18 | 16.7% |
 
-Benchmark bw2c2gz90 (mini_018/019/020, valid runs only, rep3 loop_testnames/loop_reflect lost to quota):
+Per-task loop_reflect: mini_016=1/3, mini_017=0/3, mini_018=0/3, mini_019=**2/3**, mini_020=0/3, mini_021=1/3
 
-| task | loop | loop_testnames | loop_reflect | notes |
-|---|---|---|---|---|
-| mini_018 | 0/3 | 0/2 | 0/0 (all ERROR) | No valid loop_reflect data. Rerun needed. |
-| mini_019 | **2/3** | 1/1 | 1/1 | NOT reflection-critical! loop=67% already. Bug B file renamed. |
-| mini_020 | 0/3 | 0/2 | **2/2** | CONFIRMED reflection-critical. |
-
-**Key finding:** mini_019 solved by loop=2/3 because `stock_log.py` was too obviously named in a stock pipeline — model found it in 6 rounds. Renamed to `event_log.py`. Rerun needed.
-
-Pooled confirmed tasks (016/017/020 only): loop_reflect=6/7=86%, loop=1/9=11%, loop_testnames=1/7=14%.
-(Prior pooled 016+017+019+020 stats are invalidated by mini_019 not being reflection-critical.)
+**Key finding**: Tasks are now too hard without hints. Overall solve rate 11–17% — no signal. mini_019 (event_log.py) is the only task with residual reflection-critical signal. Need to increase tool budget or recalibrate cascade difficulty.
 
 ---
 
 ## Path Forward (priority order)
 
-1. **Fresh quota day: rerun mini_018 + mini_019 (fixed) + mini_020 (rep3) full 3×**
+1. **Recalibrate task difficulty**: at tool_rounds=6 on cleaned tasks, all baselines fail ~85% of the time. Try tool_rounds=8 or 10 — see if any task becomes selectively solvable by loop_reflect only.
    ```
-   patchloop bench -t mini_018 -t mini_019 -t mini_020 -b loop -b loop_testnames -b loop_reflect \
-     --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 45 --call-delay 10
+   patchloop bench -t mini_016 -t mini_017 -t mini_019 -b loop -b loop_testnames -b loop_reflect \
+     --model accounts/fireworks/models/gpt-oss-120b --tool-rounds 8 --num-runs 3 --run-delay 45 --call-delay 5
    ```
-   Goal: confirm or deny each as reflection-critical. Target: 5 confirmed tasks.
 
-2. **Fresh quota day: run mini_021 (new task, different Bug B type)**
-   ```
-   patchloop bench -t mini_021 -b loop -b loop_testnames -b loop_reflect \
-     --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 45 --call-delay 10
-   ```
-   Goal: add task diversity (wrong-sign Bug B vs int() truncation in 016-020).
+2. **Alternately: redesign cascade difficulty** — make Bug A easier (more obvious) so it's fixed in iter 1, leaving Bug B as the pure reflection target. Currently Bug A itself may be too hard to find in 6 rounds.
 
-3. **Statistical update**: once 5+ confirmed tasks, repool and run:
+3. **Re-examine mini_019**: Only task showing residual signal (loop_reflect=2/3 vs loop=0/3). Confirm with fresh 3× run.
+
+4. **Statistical update**: once 2+ tasks confirmed on cleaned data, repool:
    ```
    python eval/analysis/stats.py --tasks 016 017 018 019 020 021
    ```
-   Report per-task outcomes as primary. Note pooled Fisher is optimistic (within-task clustering).
 
-4. **Second model validation**: Run on Groq (llama-3.3-70b-versatile, 200K TPD) — one sweep/day.
+5. **Second model validation**: Fireworks gpt-oss-120b confirmed working. Could also try SambaNova (Meta-Llama-3.3-70B).
 
 ---
 
@@ -81,9 +68,9 @@ pip install -e ".[dev]"            # if reinstalling
 ## Commands
 
 ```bash
-patchloop run mini_016 --model gpt-oss-120b --baseline loop_reflect --tool-rounds 6
-patchloop bench -t mini_016 -t mini_017 -b loop -b loop_testnames -b loop_reflect \
-  --model gpt-oss-120b --tool-rounds 6 --num-runs 3 --run-delay 30 --call-delay 7
+patchloop run mini_016 --model accounts/fireworks/models/gpt-oss-120b --baseline loop_reflect --tool-rounds 8
+patchloop bench -t mini_016 -t mini_017 -t mini_019 -b loop -b loop_testnames -b loop_reflect \
+  --model accounts/fireworks/models/gpt-oss-120b --tool-rounds 8 --num-runs 3 --run-delay 45 --call-delay 5
 pytest eval/tasks/repos/mini_016/ -q --tb=short   # verify task fails on buggy code
 ruff check patchloop/ tests/ eval/analysis/
 ```
@@ -109,6 +96,8 @@ ruff check patchloop/ tests/ eval/analysis/
 - **Reflection injection** (planner.py `build_user_message`): only when `baseline == "loop_reflect"` AND reflections non-empty. Injects all lessons + `FAILED test_xxx` lines from last stdout.
 - **loc_changed**: uses `git diff <snapshot_sha>` not uncommitted edits (always empty after commit).
 - **Cerebras token quota**: free tier has DAILY TOKEN BUDGET (not just RPD). 3× bench at tool_rounds≥10 exhausts it. Never make test calls before a benchmark. Use `--call-delay 7`.
+- **patch_assessment** (state.py, reflector.py, planner.py): Reflector classifies each patch as `likely_wrong | likely_partial_success | unclear`. If `likely_partial_success`, planner prepends "do NOT revert — look for second bug" instead of standard lesson. Test delta (prev/curr pass counts) is injected into reflector prompt to enable this classification.
+- **# BUG: comments removed**: All mini_016–021 buggy files had inline `# BUG: ...` comments that leaked bug location/type. Removed in Session 26 — do not re-add these to reflection-critical tasks.
 
 ---
 
@@ -155,12 +144,12 @@ Bug B type diversity (important for generalization claim):
 | mini_013 | validator+serializer falsy cascade | too easy (single_shot solves) |
 | mini_014 | aggregator wrong group key | too easy (0 tool calls) |
 | mini_015 | enricher+reducer 0-value cascade | PATHOLOGICAL — reflector gives anti-helpful lessons |
-| mini_016 | summarizer avg + record_ops.py precision | **CONFIRMED** loop_reflect=66.7% (3×) |
-| mini_017 | aggregator denominator + entry_log.py truncation | **CONFIRMED** loop_reflect=66.7% (3×) |
-| mini_018 | rate_calc wrong divisor + job_ops.py truncation | Bug B redesigned; rerun needed (rep3 lost to quota) |
-| mini_019 | shrink_calc wrong divisor + event_log.py truncation | Renamed Bug B file: stock_log→event_log (was too discoverable). Rerun needed. |
-| mini_020 | score_calc wrong divisor + score_entry.py truncation | loop_reflect=1/2 (partial, rep3 needed) |
-| mini_021 | cost_calc wrong field (weight vs qty) + batch_ops.py **wrong sign** (- instead of +) | Built, cascade verified. **Different Bug B type** — first non-truncation Bug B. Run needed. |
+| mini_016 | summarizer avg + record_ops.py precision | Cleaned: loop_reflect=1/3. Prior 66.7% was BUG-comment-aided. |
+| mini_017 | aggregator denominator + entry_log.py truncation | Cleaned: loop_reflect=0/3. Prior 66.7% was BUG-comment-aided. |
+| mini_018 | rate_calc wrong divisor + job_ops.py truncation | Cleaned: loop_reflect=0/3. Never confirmed. Rerun at higher tool budget. |
+| mini_019 | shrink_calc wrong divisor + event_log.py truncation | Cleaned: loop_reflect=**2/3**, loop=0/3. Only task with residual signal. Prioritize reconfirmation. |
+| mini_020 | score_calc wrong divisor + score_entry.py truncation | Cleaned: loop_reflect=0/3. Prior 2/2 was BUG-comment-aided. |
+| mini_021 | cost_calc wrong field (weight vs qty) + batch_ops.py **wrong sign** (- instead of +) | Cleaned: loop_reflect=1/3. First non-truncation Bug B type. Rerun needed. |
 
 ---
 
@@ -168,10 +157,12 @@ Bug B type diversity (important for generalization claim):
 
 | Provider | Key var | Model | TPD (free) | Notes |
 |---|---|---|---|---|
-| **Cerebras (primary)** | `CEREBRAS_API_KEY` (in ~/.zshenv) | `gpt-oss-120b` | ~1M | Best free option. 14,400 RPD. Daily token budget (~1M/day estimated from use). |
-| Groq | `LLM_API_KEY` + `LLM_BASE_URL=https://api.groq.com/openai/v1` | `gpt-oss-120b` or `llama-3.3-70b-versatile` | 200K / 100K | Free tier TPD confirmed lower than Cerebras. Use for second-model validation only. |
-| SambaNova | `LLM_API_KEY` + `LLM_BASE_URL=https://api.sambanova.ai/v1` | `Meta-Llama-3.3-70B-Instruct` | 200K | 20 RPD / 200K TPD. Not better than Cerebras. Second-model validation only. |
-| Gemini | `GEMINI_API_KEY` | `gemini-2.5-flash` | — | ~50 RPD (too low for bench) |
+| **Fireworks (primary)** | `LLM_API_KEY` (in ~/.zshenv) + `LLM_BASE_URL=https://api.fireworks.ai/inference/v1` | `accounts/fireworks/models/gpt-oss-120b` | $6 free credits | Paid but cheap. Confirmed working with tool use. Use tool_rounds=10 to avoid exhaustion fallback. |
+| Cerebras (secondary) | `CEREBRAS_API_KEY` (in ~/.zshenv) | `qwen-3-235b-a22b-instruct-2507` | ~1M | Congestion issues during US hours. gpt-oss-120b removed 2026-03-15. |
+| Groq | `LLM_API_KEY` + `LLM_BASE_URL=https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | 100K | llama tool use broken (outputs raw text). gpt-oss-120b only 200K TPD. Not viable for full sweep. |
+| SambaNova | `LLM_API_KEY` + `LLM_BASE_URL=https://api.sambanova.ai/v1` | `Meta-Llama-3.3-70B-Instruct` | 200K | 20 RPD / 200K TPD. Second-model validation only. |
+
+**⚠ Model cohort break**: prior mini_016/017 "confirmed" data used `gpt-oss-120b` via Cerebras AND had # BUG: comments — both are confounds. All valid cleaned data uses Fireworks gpt-oss-120b without BUG comments. Do not pool old and new.
 
 **Token reduction (implemented in planner.py):**
 - `read_file` truncated at 200 lines — minimal impact on small task repos, good hygiene
