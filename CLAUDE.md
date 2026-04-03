@@ -16,7 +16,7 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 **⚠ CONFOUND DISCOVERED + RESOLVED**: All reflection-critical tasks (mini_016–021) had `# BUG:` inline comments that leaked bug location and type to the model. Prior "confirmed" results (016=66.7%, 017=66.7%, 020=2/2) are invalidated — the model was reading the hints, not reasoning from reflection. Comments removed in Session 26.
 
-**21 tasks built. Cleaned first sweep complete (report_1775208132.json). No task confirmed reflection-critical on cleaned data yet. Recalibration needed.**
+**23 tasks built. Cleaned first sweep complete (report_1775208132.json). No task confirmed reflection-critical on cleaned data yet. Recalibration needed.**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 
@@ -183,6 +183,8 @@ Bug B type diversity (important for generalization claim):
 | mini_019 | shrink_calc wrong divisor + event_log.py truncation | **ANCHOR TASK.** loop_reflect=2/3 consistent across 2 sweeps. Confirm with 10 reps. |
 | mini_020 | score_calc wrong divisor + score_entry.py truncation | Triage: loop=0/3 at tool_rounds=12 — Bug A too hard. Drop or redesign. |
 | mini_021 | cost_calc wrong field (weight vs qty) + batch_ops.py **wrong sign** (- instead of +) | Signal pass: loop_testnames=3/3 > loop_reflect=1/3 — not reflection-critical. Drop. |
+| mini_022 | rate_calc inverted division + record_ops.py expand_refund_rows copies full refund per item | **NEW** multi-hop Bug B: symptom in summary_builder → pipeline → record_ops (3-hop chain). Cascade verified. |
+| mini_023 | score_calc inverted division + record_ops.py attach_risk_flags misses "review" decisions | **NEW** multi-hop Bug B: symptom in score_summary → record_ops (2-hop chain). Cascade verified. |
 
 ---
 

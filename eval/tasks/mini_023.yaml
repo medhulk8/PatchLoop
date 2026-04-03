@@ -1,0 +1,21 @@
+task_id: mini_023
+repo: repos/mini_023
+issue: |
+  The risk scoring pipeline is returning risk scores greater than 1.0 for
+  most customers, which is invalid — scores should be a proportion between
+  0.0 and 1.0. Event loading and routing complete without errors.
+
+  The output structure is correct, but the final risk score values are
+  systematically wrong in a way that suggests the score formula is using
+  its inputs incorrectly.
+test_cmd: pytest test_regression.py -v
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - wrong-file-trap
+  - reflection-critical
+  - generic-test-names
+  - multi-hop-bug-b
+  - risk-score

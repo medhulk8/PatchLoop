@@ -1,0 +1,21 @@
+task_id: mini_022
+repo: repos/mini_022
+issue: |
+  The refund analytics pipeline is producing refund rates above 1.0 for
+  processed orders, which is mathematically impossible for a proportional
+  rate. The rate should always be a value between 0.0 and 1.0.
+
+  Records load and validate correctly, and the output structure looks intact.
+  The problem appears to be in how the final rate is computed from the
+  aggregated totals.
+test_cmd: pytest test_regression.py -v
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - wrong-file-trap
+  - reflection-critical
+  - generic-test-names
+  - multi-hop-bug-b
+  - refund-rate
