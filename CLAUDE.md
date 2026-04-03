@@ -14,7 +14,7 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 ## Current Status
 
-**24 tasks built. First statistically significant result on clean data achieved (Session 27).**
+**25 tasks built. First statistically significant result on clean data achieved (Session 27).**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 
@@ -126,6 +126,7 @@ ruff check patchloop/ tests/ eval/analysis/
 | mini_022 | rate_calc.py inverted division | record_ops.expand_refund_rows: copies full refund per item | **CONFIRMED** loop_reflect=4/9=44%, loop=1/16=6% |
 | mini_023 | score_calc.py inverted division | record_ops.attach_risk_flags: misses "review" | Negative variant — boolean Bug B too shallow. loop_reflect=1/6=17% |
 | mini_024 | rate_calc.py inverted division | record_ops.expand_dispute_rows: copies full disputed_value per item | **CONFIRMED** loop_reflect=4/10=40%, loop=0/8=0%, loop_testnames=0/7=0% |
+| mini_025 | rate_calc.py inverted division | record_ops.expand_sample_rows: copies full defective_units per item | **NEW** defect-rate pipeline. 3-hop chain. Cascade verified. Run needed. |
 
 ---
 

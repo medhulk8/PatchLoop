@@ -1,0 +1,22 @@
+task_id: mini_025
+repo: repos/mini_025
+issue: |
+  The defect analytics pipeline is producing defect rates well above 1.0,
+  which is impossible — defect rate should be total defective units divided
+  by total inspected units, always a proportion between 0.0 and 1.0.
+
+  The aggregated totals (total defective, total units) appear reasonable
+  when inspected individually. The error is isolated to the final step that
+  converts those two totals into a proportional rate — the formula appears
+  to have the numerator and denominator swapped.
+test_cmd: pytest test_regression.py -v
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - wrong-file-trap
+  - reflection-critical
+  - generic-test-names
+  - multi-hop-bug-b
+  - defect-rate
