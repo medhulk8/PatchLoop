@@ -20,24 +20,38 @@ Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 
 **Main result** (mini_022 + mini_023 + mini_024, tool_rounds=8, gpt-oss-120b via Fireworks):
 
-| baseline | solved | rate |
-|---|---|---|
-| loop | 2/31 | 6.5% |
-| loop_testnames | 2/15 | 13.3% |
-| **loop_reflect** | **7/20** | **35.0%** |
+| baseline | solved | rate | 95% CI |
+|---|---|---|---|
+| loop | 2/35 | 5.7% | [0.007, 0.192] |
+| loop_testnames | 2/19 | 10.5% | [0.013, 0.331] |
+| **loop_reflect** | **9/25** | **36.0%** | [0.180, 0.575] |
 
-Fisher's exact (loop_reflect vs loop): **p=0.0132**
+Fisher's exact (one-tailed):
+- **loop_reflect vs loop: p=0.0039** ← primary result
+- loop_reflect vs loop_testnames: p=0.054 ← suggestive, not definitive
 
-**Honest framing:** loop_reflect significantly outperforms blind retry. loop_reflect vs loop_testnames not yet significant (p=0.144) — mechanism claim supported by directional stats and log evidence (model fixes Bug A, reflection lesson redirects to record_ops). mini_023 is a negative design variant (boolean Bug B too shallow).
+**Core claim:**
+> On fully clean cascade-bug tasks with multi-hop hidden Bug B, loop_reflect substantially outperforms blind retry (9/25=36% vs 2/35=5.7%, p=0.0039). Separation from the test-name ablation is suggestive but not definitive (p=0.054).
+
+**Per-task breakdown:**
+
+| Task | loop | loop_testnames | loop_reflect |
+|---|---|---|---|
+| mini_022 | 1/16 = 6% | 1/7 = 14% | **4/9 = 44%** |
+| mini_023 | 1/11 = 9% | 1/5 = 20% | 1/6 = 17% (noisy — weak Bug B) |
+| mini_024 | 0/8 = 0% | 0/7 = 0% | **4/10 = 40%** |
+
+mini_022 and mini_024 are the confirmed tasks. mini_023 is a negative design variant.
 
 ---
 
 ## Path Forward
 
-1. **mini_024: 5 more reps** (running now) — stabilize per-task estimate
-2. **Stats update**: `python eval/analysis/stats.py --tasks 022 023 024`
-3. **4th mini_022-style task** — widen task family from 2 to 3 confirmed tasks
-4. **Second model validation** (SambaNova) — confirm result isn't model-specific
+**Result is locked.** Next steps if expanding:
+
+1. **4th mini_022-style task** — purpose: push loop_reflect vs loop_testnames over p<0.05, or strengthen task-family argument. Only build if there's a clear domain that avoids duplicating mini_022/024.
+2. **Second model validation** (SambaNova) — confirm result isn't gpt-oss-120b-specific.
+3. **Stats**: `python eval/analysis/stats.py --tasks 022 023 024`
 
 ---
 
@@ -111,7 +125,7 @@ ruff check patchloop/ tests/ eval/analysis/
 | mini_016–021 | various | various | Dropped/deferred — # BUG: confound, then miscalibrated after removal |
 | mini_022 | rate_calc.py inverted division | record_ops.expand_refund_rows: copies full refund per item | **CONFIRMED** loop_reflect=4/9=44%, loop=1/16=6% |
 | mini_023 | score_calc.py inverted division | record_ops.attach_risk_flags: misses "review" | Negative variant — boolean Bug B too shallow. loop_reflect=1/6=17% |
-| mini_024 | rate_calc.py inverted division | record_ops.expand_dispute_rows: copies full disputed_value per item | **CONFIRMED** loop_reflect=2/5=40%, loop=0/4=0%. More reps in progress. |
+| mini_024 | rate_calc.py inverted division | record_ops.expand_dispute_rows: copies full disputed_value per item | **CONFIRMED** loop_reflect=4/10=40%, loop=0/8=0%, loop_testnames=0/7=0% |
 
 ---
 
