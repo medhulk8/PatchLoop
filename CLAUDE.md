@@ -36,49 +36,54 @@ Per-task loop_reflect: mini_016=1/3, mini_017=0/3, mini_018=0/3, mini_019=**2/3*
 
 ## Path Forward (priority order)
 
-### Phase 1: Triage pass — which tasks can find Bug A?
+The goal is a **probabilistic regime** — not a perfect deterministic sweet spot. Tasks should make brute-force rare enough that reflection has measurable headroom, not impossible.
 
-Run `loop` only at `tool_rounds=12`, 3 reps across all 6 tasks. Goal: identify tasks where `loop` solves at ≥1/3 (i.e., Bug A is findable). Tasks that fail 3/3 at this budget need Bug A redesign, not more budget.
+### Phase 1: Confirm mini_019 anchor (10 reps)
 
-```
-patchloop bench -t mini_016 -t mini_017 -t mini_018 -t mini_019 -t mini_020 -t mini_021 \
-  -b loop --model accounts/fireworks/models/gpt-oss-120b \
-  --tool-rounds 12 --num-runs 3 --run-delay 45 --call-delay 5
-```
-
-**Keep:** tasks where loop solves 1–2/3 (Bug A findable, Bug B still hidden).
-**Redesign Bug A:** tasks where loop solves 0/3 (Bug A too hard; not a reflection problem).
-**Drop or defer:** tasks where loop solves 3/3 (too easy overall).
-
-### Phase 2: Signal pass — reflection vs baselines
-
-For tasks that passed triage (loop=1-2/3), run all 3 baselines full 3×:
+mini_019 is the only task showing consistent loop_reflect > loop across two independent sweeps (tool_rounds=6 and 12). Run 10 reps to confirm this is signal, not bounce.
 
 ```
-patchloop bench -t <passing_tasks> -b loop -b loop_testnames -b loop_reflect \
+patchloop bench -t mini_019 -b loop -b loop_testnames -b loop_reflect \
   --model accounts/fireworks/models/gpt-oss-120b \
-  --tool-rounds 12 --num-runs 3 --run-delay 45 --call-delay 5
+  --tool-rounds 8 --num-runs 10 --run-delay 45 --call-delay 5
 ```
 
-**Promote task** if: loop≈0–33%, loop_testnames≈0–33%, loop_reflect≥67%.
+Target: loop_reflect ≥ 6/10 while loop ≤ 4/10 and loop_testnames ≤ 4/10.
 
-### Phase 3: Bug A redesign (for tasks that failed triage)
+### Phase 2: Build 2 new mini_019-style tasks
 
-Make Bug A more discoverable without adding BUG comments:
-- Stronger issue description (describe the affected behavior, not the file)
-- Ensure first failing test's traceback points toward the right subsystem
-- Code locality: Bug A should be reachable from an obvious entry point
+Do NOT try to rescue mini_017, mini_018, mini_020, mini_021. Build 2 new tasks from scratch matching mini_019's structural shape:
 
-Keep Bug B: generic file name, no semantic hints, not reachable from test names.
+**Bug A design (easy):**
+- Near the obvious failing behavior, hinted by issue description
+- In a file the model is likely to open first
+- Patchable in 1 iteration with 6-8 tool rounds
 
-### Phase 4: Statistical update
+**Bug B design (multi-hop hidden):**
+- Generic filename (record_ops.py pattern) — necessary but not sufficient
+- Requires tracing 2-3 files in the call chain to localize
+- NOT just a generically-named one-line fix that opens on first try
+- Good patterns: bug in a helper called by a helper; symptom in one module, cause two hops away; several plausible files along the path
+- Still a tiny fix once localized — complexity is in finding it, not fixing it
 
-Once ≥2 tasks confirmed with the right pattern:
+**Why multi-hop matters:** generic naming alone fails at higher tool budgets because the model opens many files by luck. Multi-hop indirection forces relational reasoning that reflection can specifically help with ("look further along the same data path").
+
+### Phase 3: Calibrate at tool_rounds=8
+
+Test new tasks at tool_rounds=8 (not 6, not 12):
+- 6 was too tight — Bug A often unreachable
+- 12 was too permissive — brute-force solved both bugs by luck
+- 8 is the middle ground: Bug A reachable, Bug B requires directed search
+
+### Phase 4: Statistical update (once 3 tasks confirmed)
+
 ```
-python eval/analysis/stats.py --tasks 016 017 018 019 020 021
+python eval/analysis/stats.py --tasks 019 <new_task_1> <new_task_2>
 ```
 
-**Note:** do NOT increase `max_iterations` — more reflection cycles without better Bug A coverage just adds noise. The bottleneck is exploration budget (tool_rounds), not iteration count.
+Minimum viable evidence: 3 tasks each showing loop_reflect > loop and loop_reflect > loop_testnames, with a pooled Fisher p<0.05.
+
+**Note:** do NOT increase `max_iterations`. The bottleneck is exploration budget (tool_rounds), not iteration count.
 
 ---
 
@@ -95,10 +100,10 @@ pip install -e ".[dev]"            # if reinstalling
 ## Commands
 
 ```bash
-patchloop run mini_019 --model accounts/fireworks/models/gpt-oss-120b --baseline loop --tool-rounds 12
-# Triage pass (loop only, tool_rounds=12):
-patchloop bench -t mini_016 -t mini_017 -t mini_018 -t mini_019 -t mini_020 -t mini_021 \
-  -b loop --model accounts/fireworks/models/gpt-oss-120b --tool-rounds 12 --num-runs 3 --run-delay 45 --call-delay 5
+patchloop run mini_019 --model accounts/fireworks/models/gpt-oss-120b --baseline loop_reflect --tool-rounds 8
+# mini_019 anchor confirmation (10 reps):
+patchloop bench -t mini_019 -b loop -b loop_testnames -b loop_reflect \
+  --model accounts/fireworks/models/gpt-oss-120b --tool-rounds 8 --num-runs 10 --run-delay 45 --call-delay 5
 pytest eval/tasks/repos/mini_016/ -q --tb=short   # verify task fails on buggy code
 ruff check patchloop/ tests/ eval/analysis/
 ```
@@ -172,12 +177,12 @@ Bug B type diversity (important for generalization claim):
 | mini_013 | validator+serializer falsy cascade | too easy (single_shot solves) |
 | mini_014 | aggregator wrong group key | too easy (0 tool calls) |
 | mini_015 | enricher+reducer 0-value cascade | PATHOLOGICAL — reflector gives anti-helpful lessons |
-| mini_016 | summarizer avg + record_ops.py precision | Cleaned: loop_reflect=1/3. Prior 66.7% was BUG-comment-aided. |
-| mini_017 | aggregator denominator + entry_log.py truncation | Cleaned: loop_reflect=0/3. Prior 66.7% was BUG-comment-aided. |
-| mini_018 | rate_calc wrong divisor + job_ops.py truncation | Cleaned: loop_reflect=0/3. Never confirmed. Rerun at higher tool budget. |
-| mini_019 | shrink_calc wrong divisor + event_log.py truncation | Cleaned: loop_reflect=**2/3**, loop=0/3. Only task with residual signal. Prioritize reconfirmation. |
-| mini_020 | score_calc wrong divisor + score_entry.py truncation | Cleaned: loop_reflect=0/3. Prior 2/2 was BUG-comment-aided. |
-| mini_021 | cost_calc wrong field (weight vs qty) + batch_ops.py **wrong sign** (- instead of +) | Cleaned: loop_reflect=1/3. First non-truncation Bug B type. Rerun needed. |
+| mini_016 | summarizer avg + record_ops.py precision | Triage: loop=3/3 at tool_rounds=12 — too easy. Defer. |
+| mini_017 | aggregator denominator + entry_log.py truncation | Triage: loop=0/3 at tool_rounds=12 — Bug A too hard. Drop or redesign. |
+| mini_018 | rate_calc wrong divisor + job_ops.py truncation | Signal pass: all baselines 1/3 — pure noise. Drop. |
+| mini_019 | shrink_calc wrong divisor + event_log.py truncation | **ANCHOR TASK.** loop_reflect=2/3 consistent across 2 sweeps. Confirm with 10 reps. |
+| mini_020 | score_calc wrong divisor + score_entry.py truncation | Triage: loop=0/3 at tool_rounds=12 — Bug A too hard. Drop or redesign. |
+| mini_021 | cost_calc wrong field (weight vs qty) + batch_ops.py **wrong sign** (- instead of +) | Signal pass: loop_testnames=3/3 > loop_reflect=1/3 — not reflection-critical. Drop. |
 
 ---
 
