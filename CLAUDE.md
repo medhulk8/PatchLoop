@@ -36,22 +36,49 @@ Per-task loop_reflect: mini_016=1/3, mini_017=0/3, mini_018=0/3, mini_019=**2/3*
 
 ## Path Forward (priority order)
 
-1. **Recalibrate task difficulty**: at tool_rounds=6 on cleaned tasks, all baselines fail ~85% of the time. Try tool_rounds=8 or 10 — see if any task becomes selectively solvable by loop_reflect only.
-   ```
-   patchloop bench -t mini_016 -t mini_017 -t mini_019 -b loop -b loop_testnames -b loop_reflect \
-     --model accounts/fireworks/models/gpt-oss-120b --tool-rounds 8 --num-runs 3 --run-delay 45 --call-delay 5
-   ```
+### Phase 1: Triage pass — which tasks can find Bug A?
 
-2. **Alternately: redesign cascade difficulty** — make Bug A easier (more obvious) so it's fixed in iter 1, leaving Bug B as the pure reflection target. Currently Bug A itself may be too hard to find in 6 rounds.
+Run `loop` only at `tool_rounds=12`, 3 reps across all 6 tasks. Goal: identify tasks where `loop` solves at ≥1/3 (i.e., Bug A is findable). Tasks that fail 3/3 at this budget need Bug A redesign, not more budget.
 
-3. **Re-examine mini_019**: Only task showing residual signal (loop_reflect=2/3 vs loop=0/3). Confirm with fresh 3× run.
+```
+patchloop bench -t mini_016 -t mini_017 -t mini_018 -t mini_019 -t mini_020 -t mini_021 \
+  -b loop --model accounts/fireworks/models/gpt-oss-120b \
+  --tool-rounds 12 --num-runs 3 --run-delay 45 --call-delay 5
+```
 
-4. **Statistical update**: once 2+ tasks confirmed on cleaned data, repool:
-   ```
-   python eval/analysis/stats.py --tasks 016 017 018 019 020 021
-   ```
+**Keep:** tasks where loop solves 1–2/3 (Bug A findable, Bug B still hidden).
+**Redesign Bug A:** tasks where loop solves 0/3 (Bug A too hard; not a reflection problem).
+**Drop or defer:** tasks where loop solves 3/3 (too easy overall).
 
-5. **Second model validation**: Fireworks gpt-oss-120b confirmed working. Could also try SambaNova (Meta-Llama-3.3-70B).
+### Phase 2: Signal pass — reflection vs baselines
+
+For tasks that passed triage (loop=1-2/3), run all 3 baselines full 3×:
+
+```
+patchloop bench -t <passing_tasks> -b loop -b loop_testnames -b loop_reflect \
+  --model accounts/fireworks/models/gpt-oss-120b \
+  --tool-rounds 12 --num-runs 3 --run-delay 45 --call-delay 5
+```
+
+**Promote task** if: loop≈0–33%, loop_testnames≈0–33%, loop_reflect≥67%.
+
+### Phase 3: Bug A redesign (for tasks that failed triage)
+
+Make Bug A more discoverable without adding BUG comments:
+- Stronger issue description (describe the affected behavior, not the file)
+- Ensure first failing test's traceback points toward the right subsystem
+- Code locality: Bug A should be reachable from an obvious entry point
+
+Keep Bug B: generic file name, no semantic hints, not reachable from test names.
+
+### Phase 4: Statistical update
+
+Once ≥2 tasks confirmed with the right pattern:
+```
+python eval/analysis/stats.py --tasks 016 017 018 019 020 021
+```
+
+**Note:** do NOT increase `max_iterations` — more reflection cycles without better Bug A coverage just adds noise. The bottleneck is exploration budget (tool_rounds), not iteration count.
 
 ---
 
@@ -68,9 +95,10 @@ pip install -e ".[dev]"            # if reinstalling
 ## Commands
 
 ```bash
-patchloop run mini_016 --model accounts/fireworks/models/gpt-oss-120b --baseline loop_reflect --tool-rounds 8
-patchloop bench -t mini_016 -t mini_017 -t mini_019 -b loop -b loop_testnames -b loop_reflect \
-  --model accounts/fireworks/models/gpt-oss-120b --tool-rounds 8 --num-runs 3 --run-delay 45 --call-delay 5
+patchloop run mini_019 --model accounts/fireworks/models/gpt-oss-120b --baseline loop --tool-rounds 12
+# Triage pass (loop only, tool_rounds=12):
+patchloop bench -t mini_016 -t mini_017 -t mini_018 -t mini_019 -t mini_020 -t mini_021 \
+  -b loop --model accounts/fireworks/models/gpt-oss-120b --tool-rounds 12 --num-runs 3 --run-delay 45 --call-delay 5
 pytest eval/tasks/repos/mini_016/ -q --tb=short   # verify task fails on buggy code
 ruff check patchloop/ tests/ eval/analysis/
 ```
