@@ -47,10 +47,18 @@ mini_022 and mini_024 are the confirmed tasks. mini_023 is a negative design var
 
 ## Path Forward
 
-**Result is locked.** Next steps if expanding:
+**Result is locked. Main claim uses mini_022 + mini_023 + mini_024 only.**
 
-1. **4th mini_022-style task** — purpose: push loop_reflect vs loop_testnames over p<0.05, or strengthen task-family argument. Only build if there's a clear domain that avoids duplicating mini_022/024.
-2. **Second model validation** (SambaNova) — confirm result isn't gpt-oss-120b-specific.
+mini_025 is a second negative design variant — loop_testnames=2/5, loop_reflect=0/5 because test_04 directly referenced `sample_size`, letting loop_testnames infer the expansion mechanic from the test body. Exclude from main claim pool.
+
+**Negative design lessons:**
+- mini_023: boolean classification Bug B → baseline stumbles on it by lucky file open
+- mini_025: test_04 assertions expose expansion-related fields → loop_testnames infers Bug B from test body
+- Implication: test_regression_04 must assert on a downstream metric (refund_rate, chargeback_rate) — NOT on intermediate fields like total_refunded or sample_size directly
+
+**Next steps:**
+1. **Second model validation** (SambaNova) — run mini_022 + mini_024 to confirm result isn't gpt-oss-120b-specific.
+2. **4th confirmed task (optional)** — only if test design can avoid leaking expansion mechanic. test_04 must only assert on the final rate, not intermediate totals.
 3. **Stats**: `python eval/analysis/stats.py --tasks 022 023 024`
 
 ---
@@ -126,7 +134,7 @@ ruff check patchloop/ tests/ eval/analysis/
 | mini_022 | rate_calc.py inverted division | record_ops.expand_refund_rows: copies full refund per item | **CONFIRMED** loop_reflect=4/9=44%, loop=1/16=6% |
 | mini_023 | score_calc.py inverted division | record_ops.attach_risk_flags: misses "review" | Negative variant — boolean Bug B too shallow. loop_reflect=1/6=17% |
 | mini_024 | rate_calc.py inverted division | record_ops.expand_dispute_rows: copies full disputed_value per item | **CONFIRMED** loop_reflect=4/10=40%, loop=0/8=0%, loop_testnames=0/7=0% |
-| mini_025 | rate_calc.py inverted division | record_ops.expand_sample_rows: copies full defective_units per item | **NEW** defect-rate pipeline. 3-hop chain. Cascade verified. Run needed. |
+| mini_025 | rate_calc.py inverted division | record_ops.expand_sample_rows: copies full defective_units per item | **Negative variant 2.** loop_testnames=2/5, loop_reflect=0/5. test_04 exposes sample_size parameter directly — loop_testnames can infer expansion mechanic from test body. Exclude from main claim. |
 
 ---
 
