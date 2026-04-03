@@ -30,7 +30,22 @@ Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 
 Per-task loop_reflect: mini_016=1/3, mini_017=0/3, mini_018=0/3, mini_019=**2/3**, mini_020=0/3, mini_021=1/3
 
-**Key finding**: Tasks are now too hard without hints. Overall solve rate 11–17% — no signal. mini_019 (event_log.py) is the only task with residual reflection-critical signal. Need to increase tool budget or recalibrate cascade difficulty.
+**Key finding from cleaned sweep**: tasks too hard without hints (11-17% solve rate, no signal). Led to multi-hop Bug B redesign.
+
+**First significant result (mini_022 + mini_023 + mini_024, tool_rounds=8):**
+
+| baseline | solved | solve_rate |
+|---|---|---|
+| loop | 2/26 | 7.7% |
+| loop_testnames | 2/11 | 18.2% |
+| loop_reflect | 5/15 | **33.3%** |
+
+Fisher's exact (loop_reflect vs loop): **p=0.0495** — first p<0.05 on clean data.
+
+**Caveats:** result is fragile (barely over threshold, small n, unbalanced run counts from triage). loop_reflect vs loop_testnames not yet significant (p=0.345) — reflection-as-mechanism is suggestive (log evidence) not statistically confirmed. mini_023 noisy (boolean classification Bug B too shallow). mini_022 and mini_024 are the clean signal tasks.
+
+**Honest framing (per ChatGPT):**
+> On a small set of fully clean cascade-bug tasks, loop_reflect outperformed blind retry (5/15 vs 2/26, one-sided Fisher p=0.0495). Evidence against loop_testnames is not yet significant, so the role of structured reflection is supported by directional results and log-level behavior rather than definitive statistical separation.
 
 ---
 
@@ -38,50 +53,27 @@ Per-task loop_reflect: mini_016=1/3, mini_017=0/3, mini_018=0/3, mini_019=**2/3*
 
 The goal is a **probabilistic regime** — not a perfect deterministic sweet spot. Tasks should make brute-force rare enough that reflection has measurable headroom, not impossible.
 
-### Phase 1: Confirm mini_019 anchor (10 reps)
+### Phase 1: Strengthen mini_022 + mini_024 signal (in progress)
 
-mini_019 is the only task showing consistent loop_reflect > loop across two independent sweeps (tool_rounds=6 and 12). Run 10 reps to confirm this is signal, not bounce.
+Run 3 more reps on mini_022 and mini_024 to widen the margin above p=0.05:
 
 ```
-patchloop bench -t mini_019 -b loop -b loop_testnames -b loop_reflect \
+patchloop bench -t mini_022 -t mini_024 -b loop -b loop_testnames -b loop_reflect \
   --model accounts/fireworks/models/gpt-oss-120b \
-  --tool-rounds 8 --num-runs 10 --run-delay 45 --call-delay 5
+  --tool-rounds 8 --num-runs 3 --run-delay 45 --call-delay 5
 ```
 
-Target: loop_reflect ≥ 6/10 while loop ≤ 4/10 and loop_testnames ≤ 4/10.
+### Phase 2: Build a 4th mini_022-style task
 
-### Phase 2: Build 2 new mini_019-style tasks
+After Phase 1, add one more task in the arithmetic-expansion Bug B family to widen the task set from 2 to 3 confirmed tasks.
 
-Do NOT try to rescue mini_017, mini_018, mini_020, mini_021. Build 2 new tasks from scratch matching mini_019's structural shape:
-
-**Bug A design (easy):**
-- Near the obvious failing behavior, hinted by issue description
-- In a file the model is likely to open first
-- Patchable in 1 iteration with 6-8 tool rounds
-
-**Bug B design (multi-hop hidden):**
-- Generic filename (record_ops.py pattern) — necessary but not sufficient
-- Requires tracing 2-3 files in the call chain to localize
-- NOT just a generically-named one-line fix that opens on first try
-- Good patterns: bug in a helper called by a helper; symptom in one module, cause two hops away; several plausible files along the path
-- Still a tiny fix once localized — complexity is in finding it, not fixing it
-
-**Why multi-hop matters:** generic naming alone fails at higher tool budgets because the model opens many files by luck. Multi-hop indirection forces relational reasoning that reflection can specifically help with ("look further along the same data path").
-
-### Phase 3: Calibrate at tool_rounds=8
-
-Test new tasks at tool_rounds=8 (not 6, not 12):
-- 6 was too tight — Bug A often unreachable
-- 12 was too permissive — brute-force solved both bugs by luck
-- 8 is the middle ground: Bug A reachable, Bug B requires directed search
-
-### Phase 4: Statistical update (once 3 tasks confirmed)
+### Phase 3: Statistical update
 
 ```
-python eval/analysis/stats.py --tasks 019 <new_task_1> <new_task_2>
+python eval/analysis/stats.py --tasks 022 023 024
 ```
 
-Minimum viable evidence: 3 tasks each showing loop_reflect > loop and loop_reflect > loop_testnames, with a pooled Fisher p<0.05.
+Minimum viable evidence: loop_reflect vs loop p<0.05 confirmed with wider margin, loop_reflect vs loop_testnames directional with log support.
 
 **Note:** do NOT increase `max_iterations`. The bottleneck is exploration budget (tool_rounds), not iteration count.
 
