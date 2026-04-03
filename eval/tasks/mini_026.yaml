@@ -1,0 +1,22 @@
+task_id: mini_026
+repo: repos/mini_026
+issue: |
+  The invoice dispute analytics pipeline is producing dispute rates well above
+  1.0, which is impossible — dispute rate should be total disputed amount
+  divided by total invoice value, always a proportion between 0.0 and 1.0.
+
+  The aggregated totals (total disputed, total invoice value) appear reasonable
+  when inspected individually. The error is isolated to the final step that
+  converts those two totals into a proportional rate — the formula appears
+  to have the numerator and denominator swapped.
+test_cmd: pytest test_regression.py -v
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - wrong-file-trap
+  - reflection-critical
+  - generic-test-names
+  - multi-hop-bug-b
+  - dispute-rate

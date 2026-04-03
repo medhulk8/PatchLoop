@@ -14,7 +14,7 @@ Goal: demonstrate measurable improvement from reflection via a formal benchmark 
 
 ## Current Status
 
-**25 tasks built. First statistically significant result on clean data achieved (Session 27).**
+**26 tasks built. First statistically significant result on clean data achieved (Session 27).**
 
 Baselines: `single_shot` | `loop` | `loop_testnames` | `loop_reflect`
 
@@ -57,8 +57,8 @@ mini_025 is a second negative design variant — loop_testnames=2/5, loop_reflec
 - Implication: test_regression_04 must assert on a downstream metric (refund_rate, chargeback_rate) — NOT on intermediate fields like total_refunded or sample_size directly
 
 **Next steps:**
-1. **Second model validation** (SambaNova) — run mini_022 + mini_024 to confirm result isn't gpt-oss-120b-specific.
-2. **4th confirmed task (optional)** — only if test design can avoid leaking expansion mechanic. test_04 must only assert on the final rate, not intermediate totals.
+1. Run signal pass on mini_026 (3 baselines, 5 reps, tool_rounds=8) — potential 4th confirmed task.
+2. If mini_026 replicates: pool 022+024+026 for tighter stats (loop_testnames p<0.05 target).
 3. **Stats**: `python eval/analysis/stats.py --tasks 022 023 024`
 
 ---
@@ -135,6 +135,7 @@ ruff check patchloop/ tests/ eval/analysis/
 | mini_023 | score_calc.py inverted division | record_ops.attach_risk_flags: misses "review" | Negative variant — boolean Bug B too shallow. loop_reflect=1/6=17% |
 | mini_024 | rate_calc.py inverted division | record_ops.expand_dispute_rows: copies full disputed_value per item | **CONFIRMED** loop_reflect=4/10=40%, loop=0/8=0%, loop_testnames=0/7=0% |
 | mini_025 | rate_calc.py inverted division | record_ops.expand_sample_rows: copies full defective_units per item | **Negative variant 2.** loop_testnames=2/5, loop_reflect=0/5. test_04 exposes sample_size parameter directly — loop_testnames can infer expansion mechanic from test body. Exclude from main claim. |
+| mini_026 | rate_calc.py inverted division | record_ops.expand_line_rows: copies full disputed_amount per item | **Pending signal pass.** Cascade verified (0/5 → 4/5 → 5/5). test_04 asserts only on dispute_rate. |
 
 ---
 
