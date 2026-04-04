@@ -1,0 +1,16 @@
+task_id: mini_011
+repo: repos/mini_011
+issue: |
+  Explicit false or zero values set in a configuration are silently lost after
+  passing through the merge-and-serialize pipeline. For example, setting
+  enabled=False results in the key being absent from the final output.
+  Fix the pipeline so that only None is treated as "unset" — False, 0, and ""
+  are valid values that must be preserved.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - falsy-sentinel
+  - reflection-critical

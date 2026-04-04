@@ -1,0 +1,21 @@
+task_id: mini_018
+repo: repos/mini_018
+issue: |
+  The job throughput analysis pipeline is reporting incorrect rates for most
+  worker groups. Input records are parsed and validated without errors. The
+  throughput rates are systematically wrong — the deviation is not a fixed
+  offset but varies across different configurations, which suggests the
+  computation is using the wrong divisor.
+
+  The output structure and worker ID assignments look correct. The issue is
+  in how throughput is calculated, not in data loading or validation.
+test_cmd: pytest test_regression.py -v
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - wrong-file-trap
+  - reflection-critical
+  - generic-test-names
+  - throughput

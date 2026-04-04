@@ -1,0 +1,15 @@
+task_id: mini_012
+repo: repos/mini_012
+issue: |
+  After rendering a template once, re-rendering the same template with a
+  different locale or output mode returns the original output instead of
+  the expected variant. Fix the rendering system so that each combination
+  of template, locale, and mode is handled independently.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - cache-key
+  - reflection-critical

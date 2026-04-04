@@ -1,0 +1,21 @@
+task_id: mini_013
+repo: repos/mini_013
+issue: |
+  When processing records through the pipeline, some field values disappear
+  or come out with unexpected values. Specifically:
+  - Zero values and empty strings that are explicitly set in the input end up
+    missing from the output.
+  - When a record field has a corresponding schema default, the output shows
+    the default value instead of the value from the record.
+
+  The pipeline's record processing logic is producing incorrect output.
+  Please investigate and fix the issue.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: hard
+tags:
+  - multi-file
+  - falsy-sentinel
+  - cascading-bugs
+  - reflection-critical

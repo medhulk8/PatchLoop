@@ -1,0 +1,14 @@
+task_id: mini_002
+repo: repos/mini_002
+issue: |
+  The paginate() function returns the wrong items. Users report that
+  every page is missing its last item, and the final partial page
+  is also incorrect. The total_pages() function appears to be correct.
+  Fix the pagination logic so all test cases pass.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: easy
+tags:
+  - off-by-one
+  - slicing

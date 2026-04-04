@@ -1,0 +1,19 @@
+task_id: mini_017
+repo: repos/mini_017
+test_cmd: pytest test_regression.py -v
+issue: |
+  The log aggregation pipeline is producing incorrect results for services
+  with multiple log entries.
+
+  In multi-entry scenarios, the reported error rates are wildly off — several
+  orders of magnitude too high in some cases. For a service with 1000 requests
+  and 10 errors spread across two entries, the pipeline is reporting an error
+  rate greater than 1.0, which is physically impossible.
+
+  There may also be a secondary data integrity issue: fractional error counts
+  (which arise from weighted or partial-window aggregation) are not being
+  preserved correctly in the output. A test covering fractional error counts
+  is failing even when the rate calculation is corrected.
+
+  The report format and reporter logic appear fine. The issue is in the
+  aggregation or statistics persistence stage of the pipeline.

@@ -1,0 +1,14 @@
+task_id: mini_003
+repo: repos/mini_003
+issue: |
+  The median() function produces incorrect results for even-length input lists.
+  For example, median([1, 2, 3, 4]) should return 2.5 but returns 3.
+  The mean(), variance(), and std_dev() functions are working correctly.
+  Only median() needs to be fixed.
+test_cmd: pytest -q --tb=short
+time_limit_s: 360
+max_iterations: 5
+difficulty: easy
+tags:
+  - off-by-one
+  - math
