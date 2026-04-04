@@ -36,3 +36,13 @@ logs/
 .vscode/
 .idea/
 *.swp
+
+# Ruff
+.ruff_cache/
+
+# Internal working docs (not for public repo)
+CLAUDE.md
+SESSIONS.md
+
+# Unused Phase 2 stubs
+patchloop/memory/
