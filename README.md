@@ -144,7 +144,25 @@ export LLM_BASE_URL=https://your-provider/v1
 ### Run a single task
 
 ```bash
+# Local execution (default)
 patchloop run mini_022 --model accounts/fireworks/models/gpt-oss-120b --baseline loop_reflect --tool-rounds 8
+
+# Docker execution (sandboxed — requires Docker)
+patchloop run mini_022 --model accounts/fireworks/models/gpt-oss-120b --baseline loop_reflect --tool-rounds 8 --docker
+```
+
+### Docker setup
+
+Build the sandbox image once:
+
+```bash
+docker build -t patchloop-sandbox:latest -f Dockerfile.sandbox .
+```
+
+If you use **Colima** instead of Docker Desktop, export the socket before running:
+
+```bash
+export DOCKER_HOST=unix:///~/.colima/default/docker.sock
 ```
 
 ### Run the benchmark
