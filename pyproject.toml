@@ -16,6 +16,7 @@ dependencies = [
     "rich>=13.0",
     "jsonlines>=4.0",
     "pytest>=8.0",
+    "docker>=7.0",
 ]
 
 [project.optional-dependencies]

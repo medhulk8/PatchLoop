@@ -70,6 +70,11 @@ def bench(
         help="Seconds to sleep before each individual LLM API call (rate-limit pacing). "
              "Use ~7.0 for Cerebras free tier (10 RPM). Default: 0.",
     ),
+    docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run tasks inside DockerEnvironment instead of LocalEnvironment.",
+    ),
 ) -> None:
     """
     Run the full benchmark across tasks and baselines.
@@ -103,6 +108,7 @@ def bench(
         num_runs=num_runs,
         run_delay_s=run_delay,
         call_delay=call_delay,
+        use_docker=docker,
     )
     results = runner.run(
         baselines=list(baselines) if baselines else None,
@@ -141,6 +147,11 @@ def run(
         "--call-delay",
         help="Seconds to sleep before each LLM API call (rate-limit pacing). Default: 0.",
     ),
+    docker: bool = typer.Option(
+        False,
+        "--docker",
+        help="Run task inside DockerEnvironment instead of LocalEnvironment.",
+    ),
 ) -> None:
     """
     Run a single task with a single baseline. Useful for debugging.
@@ -171,6 +182,7 @@ def run(
         runs_dir=runs_dir,
         max_tool_rounds=tool_rounds,
         call_delay=call_delay,
+        use_docker=docker,
     )
 
     console.print(

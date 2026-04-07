@@ -40,6 +40,7 @@ class BenchmarkRunner:
         num_runs: int = 1,
         run_delay_s: int = 30,
         call_delay: float = 0.0,
+        use_docker: bool = False,
     ) -> None:
         self.tasks_dir = tasks_dir
         self.runs_dir = runs_dir
@@ -48,6 +49,7 @@ class BenchmarkRunner:
         self.num_runs = num_runs
         self.run_delay_s = run_delay_s
         self.call_delay = call_delay
+        self.use_docker = use_docker
         self.runs_dir.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------ #
@@ -194,6 +196,7 @@ class BenchmarkRunner:
             runs_dir=self.runs_dir,
             max_tool_rounds=self.max_tool_rounds,
             call_delay=self.call_delay,
+            use_docker=self.use_docker,
         )
 
         try:

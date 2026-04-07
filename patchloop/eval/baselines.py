@@ -4,6 +4,7 @@ import uuid
 from pathlib import Path
 
 from patchloop.agent.loop import AgentLoop
+from patchloop.environment.base import Environment
 from patchloop.environment.local_env import LocalEnvironment
 from patchloop.environment.task import Task
 from patchloop.llm.client import LLMClient
@@ -19,7 +20,8 @@ def build_agent(
     runs_dir: Path,
     max_tool_rounds: int = 15,
     call_delay: float = 0.0,
-) -> tuple[AgentLoop, LocalEnvironment, RunLogger, str]:
+    use_docker: bool = False,
+) -> tuple[AgentLoop, Environment, RunLogger, str]:
     """
     Build an AgentLoop + Environment + Logger for the given task and baseline.
 
@@ -35,7 +37,12 @@ def build_agent(
         )
 
     run_id = uuid.uuid4().hex[:8]
-    env = LocalEnvironment(task)
+    if use_docker:
+        from patchloop.environment.docker_env import DockerEnvironment
+
+        env: Environment = DockerEnvironment(task)
+    else:
+        env = LocalEnvironment(task)
     llm = LLMClient(model=model, call_delay=call_delay)
     logger = RunLogger(run_id=run_id, task_id=task.task_id, runs_dir=runs_dir)
     loop = AgentLoop(task=task, env=env, llm=llm, logger=logger, baseline=baseline, max_tool_rounds=max_tool_rounds)
