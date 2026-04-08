@@ -129,6 +129,7 @@ class LLMClient:
                 "Get a free key at: https://aistudio.google.com"
             )
 
+        self.base_url = resolved_url
         self._client = OpenAI(api_key=resolved_key, base_url=resolved_url)
 
     # ------------------------------------------------------------------ #

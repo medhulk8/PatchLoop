@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from pathlib import Path
 
@@ -45,6 +46,11 @@ class BenchmarkRunner:
         self.tasks_dir = tasks_dir
         self.runs_dir = runs_dir
         self.model = model
+        self.base_url = (
+            os.environ.get("LLM_BASE_URL")
+            or os.environ.get("CEREBRAS_BASE_URL")
+            or "https://generativelanguage.googleapis.com/v1beta/openai"
+        )
         self.max_tool_rounds = max_tool_rounds
         self.num_runs = num_runs
         self.run_delay_s = run_delay_s
@@ -174,7 +180,12 @@ class BenchmarkRunner:
                 result = self._run_single(task, baseline)
                 results.append(result)
 
-                status = "[green]RESOLVED[/green]" if result.resolved else "[red]FAILED[/red]"
+                if result.resolved:
+                    status = "[green]RESOLVED[/green]"
+                elif result.termination_reason == "ERROR":
+                    status = "[yellow]ERROR[/yellow]"
+                else:
+                    status = "[red]FAILED[/red]"
                 progress.update(
                     task_label,
                     description=(
@@ -208,6 +219,7 @@ class BenchmarkRunner:
                 run_id=run_id,
                 baseline=baseline,
                 model=self.model,
+                base_url=self.base_url,
                 tool_rounds=self.max_tool_rounds,
                 resolved=False,
                 iterations_used=0,

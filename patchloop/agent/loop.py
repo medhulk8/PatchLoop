@@ -290,6 +290,7 @@ class AgentLoop:
             run_id=state.run_id,
             baseline=self.baseline,
             model=self.llm.model,
+            base_url=self.llm.base_url,
             tool_rounds=self.max_tool_rounds,
             resolved=state.resolved,
             iterations_used=len(state.iterations),

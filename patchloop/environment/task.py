@@ -58,6 +58,7 @@ class TaskResult(BaseModel):
     run_id: str
     baseline: str               # "single_shot" | "loop" | "loop_testnames" | "loop_reflect"
     model: str
+    base_url: str
     tool_rounds: int
     resolved: bool
     iterations_used: int
