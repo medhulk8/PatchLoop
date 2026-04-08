@@ -8,23 +8,23 @@ PatchLoop gives an LLM a buggy Python repository and an issue description. The a
 
 ## Result
 
-> Built a self-reflective bug-fixing agent and showed that structured reflection improved solve rate on hidden cascade bugs from **5.7% to 36.0%** over blind retry (Fisher's exact, p=0.0039).
+> Built a self-reflective bug-fixing agent and showed that structured reflection improved solve rate on hidden cascade bugs from **8.3% to 38.5%** over blind retry (Fisher's exact, p=0.0052), and from **10.0% to 38.5%** over the test-name ablation (p=0.0302).
 
 **Benchmark** — mini_022 + mini_023 + mini_024, tool_rounds=8, `gpt-oss-120b` via Fireworks AI:
 
 | Baseline | Solved | Rate | 95% CI |
 |---|---|---|---|
-| `loop` | 2/35 | 5.7% | [0.7%, 19.2%] |
-| `loop_testnames` | 2/19 | 10.5% | [1.3%, 33.1%] |
-| **`loop_reflect`** | **9/25** | **36.0%** | [18.0%, 57.5%] |
+| `loop` | 3/36 | 8.3% | [2.9%, 21.8%] |
+| `loop_testnames` | 2/20 | 10.0% | [2.8%, 30.1%] |
+| **`loop_reflect`** | **10/26** | **38.5%** | [22.4%, 57.5%] |
 
 Fisher's exact (one-tailed):
-- **loop_reflect vs loop: p = 0.0039** ← primary result
-- loop_reflect vs loop_testnames: p = 0.054 ← suggestive, not definitive
+- **loop_reflect vs loop: p = 0.0052**
+- **loop_reflect vs loop_testnames: p = 0.0302**
 
 **The claim is narrow and intentional.** This result holds specifically on cascade bugs with multi-hop hidden Bug B, generic test names, and a tight tool budget. On standard tasks with informative test names, test-name grounding alone accounts for most of the improvement and reflection adds little.
 
-**Known limitations:** The confirmed tasks (mini_022, mini_024) have test_04 comments that name the Bug B function and assert intermediate totals — a partial design leak. Empirically this did not help loop_testnames (1/7 and 0/7 respectively), but it weakens the cleanliness argument if models read test bodies. Single-model evidence only (Fireworks gpt-oss-120b).
+**Known limitations:** Single-model evidence (Fireworks gpt-oss-120b). The confirmed tasks (mini_022, mini_024) have test_04 comments describing Bug B mechanics — empirically this did not help loop_testnames (1/8 and 0/7 respectively), but it is a partial design leak.
 
 ---
 
