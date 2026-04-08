@@ -11,8 +11,8 @@ def expand_sku_rows(orders: list[OrderRecord]) -> list[dict]:
     """
     rows = []
     for o in orders:
-        units_per_sku = o.units_ordered / o.sku_count
-        for _ in range(o.sku_count):
+        units_per_sku = o.units_ordered / o.quantity
+        for _ in range(o.quantity):
             rows.append({
                 "order_id": o.order_id,
                 "units_filled": o.units_filled,

@@ -9,6 +9,6 @@ def normalize_orders(orders: list[OrderRecord]) -> list[OrderRecord]:
             order_id=o.order_id,
             units_filled=max(0.0, min(o.units_filled, o.units_ordered)),
             units_ordered=o.units_ordered,
-            sku_count=o.sku_count,
+            quantity=o.quantity,
         ))
     return normalized
