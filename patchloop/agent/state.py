@@ -127,7 +127,7 @@ class LoopState(BaseModel):
     """
     task_id: str
     run_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:8])
-    baseline: str = "loop"          # "single_shot" | "loop" | "loop_reflect"
+    baseline: str = "loop"          # "single_shot" | "loop" | "loop_testnames" | "loop_reflect"
     phase: AgentPhase = AgentPhase.PLAN
     iteration: int = 0
     max_iterations: int = 5

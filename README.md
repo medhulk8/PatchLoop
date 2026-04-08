@@ -24,6 +24,8 @@ Fisher's exact (one-tailed):
 
 **The claim is narrow and intentional.** This result holds specifically on cascade bugs with multi-hop hidden Bug B, generic test names, and a tight tool budget. On standard tasks with informative test names, test-name grounding alone accounts for most of the improvement and reflection adds little.
 
+**Known limitations:** The confirmed tasks (mini_022, mini_024) have test_04 comments that name the Bug B function and assert intermediate totals — a partial design leak. Empirically this did not help loop_testnames (1/7 and 0/7 respectively), but it weakens the cleanliness argument if models read test bodies. Single-model evidence only (Fireworks gpt-oss-120b).
+
 ---
 
 ## What Makes a Task Reflection-Critical

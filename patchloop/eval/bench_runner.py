@@ -20,7 +20,7 @@ class BenchmarkRunner:
 
     Usage:
         runner = BenchmarkRunner(tasks_dir=..., runs_dir=..., model=...)
-        results = runner.run(baselines=["single_shot", "loop", "loop_reflect"])
+        results = runner.run(baselines=["single_shot", "loop", "loop_testnames", "loop_reflect"])
         runner.report(results)
 
     Each (task, baseline) pair is an independent run. Tasks are run
@@ -207,6 +207,8 @@ class BenchmarkRunner:
                 task_id=task.task_id,
                 run_id=run_id,
                 baseline=baseline,
+                model=self.model,
+                tool_rounds=self.max_tool_rounds,
                 resolved=False,
                 iterations_used=0,
                 total_duration_s=0.0,

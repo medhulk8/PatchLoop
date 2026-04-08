@@ -12,7 +12,7 @@ def compute_metrics(results: list[TaskResult]) -> dict[str, Any]:
 
     Returns a dict with top-level summary stats and a per-baseline
     breakdown. The per-baseline breakdown is what we use to compare
-    single_shot vs loop vs loop_reflect.
+    single_shot vs loop vs loop_testnames vs loop_reflect.
     """
     if not results:
         return {}
@@ -86,7 +86,7 @@ def _count_termination_reasons(results: list[TaskResult]) -> dict[str, int]:
 def format_summary_table(summary: dict[str, Any]) -> str:
     """
     Format the metrics summary as a readable table for CLI output.
-    Ordered: single_shot < loop < loop_reflect so the comparison reads left-to-right.
+    Ordered: single_shot < loop < loop_testnames < loop_reflect so the comparison reads left-to-right.
     """
     if not summary:
         return "No results."

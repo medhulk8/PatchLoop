@@ -52,6 +52,7 @@ class AgentLoop:
         self.llm = llm
         self.logger = logger
         self.baseline = baseline
+        self.max_tool_rounds = max_tool_rounds
 
         # Agent components
         self.planner = Planner(llm, max_tool_rounds=max_tool_rounds)
@@ -288,6 +289,8 @@ class AgentLoop:
             task_id=self.task.task_id,
             run_id=state.run_id,
             baseline=self.baseline,
+            model=self.llm.model,
+            tool_rounds=self.max_tool_rounds,
             resolved=state.resolved,
             iterations_used=len(state.iterations),
             total_duration_s=state.elapsed_s,
